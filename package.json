@@ -1,0 +1,9 @@
+{
+  "type": "module",
+  "dependencies": {
+    "js2flowchart": "^1.3.5",
+    "log4js": "^6.9.1",
+    "openai": "^6.48.0",
+    "ws": "^8.21.1"
+  }
+}
