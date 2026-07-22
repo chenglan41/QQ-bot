@@ -9,7 +9,5 @@
     "port":8082,
     "uid":"",
     "sendMust":100,
-    "probability":0.01,
-    "emotionPath":"file:///E:/QQBot/emotion/",
-    "banned_user":[]
+    "probability":0.01
 }

@@ -4,6 +4,12 @@ import fs from "fs"
 import { WebSocketServer } from "ws"
 import { dync } from "./lib/dync.js"
 import { execSync } from "child_process"
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+// 获取当前文件的完整路径（含文件名）
+const __filename = fileURLToPath(import.meta.url);
+// 获取当前文件所在目录
+const __dirname = dirname(__filename);
 const config = JSON.parse(fs.readFileSync("config.json").toString())
 const openai = new OpenAI({
     baseURL: config.baseURL,
@@ -123,7 +129,7 @@ wss.on('connection', (ws) => {
             }
             eval(fs.readFileSync("./lib/tools.js").toString());
             var question = await openai.chat.completions.create({
-                messages: [...dync.read("skill"), ...memory, ...queue],
+                messages: [...dync.read("prompt"), ...memory, ...queue],
                 model: config.model,
                 thinking: config.thinking,
                 reasoning_effort: config.reasoning_effort,

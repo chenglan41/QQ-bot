@@ -1,0 +1,13 @@
+{
+    "baseURL":"https://api.deepseek.com/",
+    "apiKey":"",
+    "maxLogSize":10485760,
+    "model":"deepseek-v4-flash",
+    "thinking":{ "type": "disabled" },
+    "reasoning_effort": "high",
+    "stream": false,
+    "port":8082,
+    "uid":"",
+    "sendMust":100,
+    "probability":0.01
+}
