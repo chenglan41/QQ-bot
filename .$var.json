@@ -1,5 +1,7 @@
 {
     "link": [],
     "prompt": [],
-    "TemporaryMemory": {}
+    "TemporaryMemory": {},
+    "banned_user":[],
+    "admin":[]
 }

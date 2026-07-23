@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import log4js from "log4js"
 import fs from "fs"
+import axios from "axios"
 import { WebSocketServer } from "ws"
 import { dync } from "./lib/dync.js"
 import { execSync } from "child_process"
@@ -83,6 +84,33 @@ wss.on('connection', (ws) => {
                 at
             ) == false
         ) return;
+        var reply = (content) => {
+            // logger.info(content)
+            if (content == "") return;//不发送空消息
+            if (back.type == "private") {
+                ws.send(JSON.stringify({
+                    "action": "send_private_msg",
+                    "params": {
+                        "user_id": back.id,
+                        "message": content
+                    },
+                    "echo": ""
+                }));
+            }
+            else if (back.type == "group") {
+                ws.send(JSON.stringify({
+                    "action": "send_group_msg",
+                    "params": {
+                        "group_id": back.id,
+                        "message": content
+                    },
+                    "echo": ""
+                }));
+            }
+        }
+        var _over_ = false;
+        eval(fs.readFileSync("./lib/menu.js").toString());
+        if (_over_ == true) return;
         //询问器A
         //1.取出临时记忆并放到tmp
         //2.刚发的信息压入tmp
@@ -103,30 +131,7 @@ wss.on('connection', (ws) => {
         //询问器A
         for (var i = 0; i < queue.length; i++) {
             var tools, toolFunction;
-            var reply = (content) => {
-                // logger.info(content)
-                if(content == "")return;//不发送空消息
-                if (back.type == "private") {
-                    ws.send(JSON.stringify({
-                        "action": "send_private_msg",
-                        "params": {
-                            "user_id": back.id,
-                            "message": content
-                        },
-                        "echo": ""
-                    }));
-                }
-                else if (back.type == "group") {
-                    ws.send(JSON.stringify({
-                        "action": "send_group_msg",
-                        "params": {
-                            "group_id": back.id,
-                            "message": content
-                        },
-                        "echo": ""
-                    }));
-                }
-            }
+
             eval(fs.readFileSync("./lib/tools.js").toString());
             var question = await openai.chat.completions.create({
                 messages: [...dync.read("prompt"), ...memory, ...queue],
