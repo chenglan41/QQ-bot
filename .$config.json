@@ -9,5 +9,7 @@
     "port":8082,
     "uid":"",
     "sendMust":100,
-    "probability":0.01
+    "probability":0.01,
+    "saveTime":100000,
+    "returnToken":300000
 }

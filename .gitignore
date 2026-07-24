@@ -1,6 +1,5 @@
-sealedContent.json
 config.json
-var.json
 node_modules/
 emotion/
 log/
+space.json

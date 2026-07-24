@@ -20,8 +20,8 @@
     "uid":"",//QQ号
     "sendMust":100,//随机回复信息中保底信息数(接收100条信息至少回复一条)
     "probability":0.01,//随机回复信息的概率
-    "emotionPath":"file://.../",//表情存放路径,以`file://`开头`/`结尾
-    "banned_user":[]//封禁的用户QQ号，此部分不会热更新
+    "saveTime":100000,//space变量自动保存时间(ms)
+    "returnToken":300000//某次询问超过该tokens时自动将上下文转为记忆
 }
 ```
 ## 启动
@@ -49,20 +49,11 @@ at: @列表
 + 用于发送表情的 emotion
 表情存在 ./emotion/ 下
 
-需要注意的是，在 lib/tools.js 找到 `file://.../` 部分把它改为 emotion 的绝对路径
+## 持久化变量
+space变量储存在 ./space.json 中
 
-比如`file:///E:/QQBot/emotion/`
-## 动态变量
-动态变量储存在 ./var.json 中
+可以在程序运行过程中修改文件是没用的
 
-可以在程序运行过程中修改他们
-
-### link
-其中，link表示储存的客户端状态
-
-等你的napcat连接时日志会告诉你索引，
-
-通过控制该索引对应项的 true/false 可以控制是否处理该客户端的信息
 ### prompt
 prompt 用来储存系统提示词
 
@@ -77,14 +68,14 @@ prompt 用来储存系统提示词
     ]
 }
 ```
-### TemporaryContent
+### content
 存放聊天记录
 
 每个聊天记录的键为`private/group+id`
 
 ```json
 {
-    "TemporaryContent": {
+    "content": {
         "private123456": [],
         "group114514": [
             {
@@ -105,6 +96,20 @@ prompt 用来储存系统提示词
 一个数字数组，表示管理员账户
 
 只有管理员才可以进行一些未经许可的操作，如在QQ内封存记忆等
+### exec
+一个字符串数组，储存待执行的指令/写入文件操作
+### completion_tokens,prompt_cache_hit_tokens,prompt_cache_miss_tokens
+分别表示 输出消耗的总token数,命中缓存的token数,未命中缓存的token数
+## 记忆化
+当某次询问超过该tokens时自动将上下文转为记忆，
+
+其中，上下文转记忆的AI提示词储存在 AI_Memory_System.md 中（本项目预设了一套提示词）
+
+其中包含一些特殊标记:
+### ${system}
+询问时会被替换为系统身份提示词
+### ${content}
+询问时会被替换为上下文
 ## 操作工具
 操作工具可以让你对聊天记录，环境进行更便捷的操作，通常以`._`开头
 
@@ -122,3 +127,5 @@ prompt 用来储存系统提示词
 + 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
++ 添加clearContent等
++ prompt标准化

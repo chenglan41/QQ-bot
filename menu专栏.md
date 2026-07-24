@@ -6,28 +6,18 @@ menu 是独立于AI之外的功能
 
 用于实现一些固定功能，比如确认运行状态，查看余额等
 
-比如`@bot .token`会返回剩余余额
-
+比如`@bot.token`会返回剩余余额
 ## .check
 确认运行状态，测试napcat是否被踢下线
 ## .token
 返回 Token 余额
 ## .menu
 展示已有菜单功能
-## .seal
-封存聊天记录，封存的聊天记录不会加入AI的缓存中，
-
-封存的聊天记录储存在`sealedContent.json`中
-
-**注:该操作会封存所有聊天聊天记录**
-## .clear
-清除所有聊天记录，不同于封存，它不会留下任何记录
-
-## .count
-统计封存的聊天记录的信息条数
-
 ## .ban QQ号
 不回复某用户消息
-
 ## .unban QQ号
 解除ban效果
+## .save
+保存space变量
+## .clearExec
+清空space.exec队列

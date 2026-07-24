@@ -3,10 +3,10 @@ import log4js from "log4js"
 import fs from "fs"
 import axios from "axios"
 import { WebSocketServer } from "ws"
-import { dync } from "./lib/dync.js"
 import { execSync } from "child_process"
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+var space = JSON.parse(fs.readFileSync("space.json").toString());
 // 获取当前文件的完整路径（含文件名）
 const __filename = fileURLToPath(import.meta.url);
 // 获取当前文件所在目录
@@ -32,15 +32,9 @@ log4js.configure({
     },
 });
 const logger = log4js.getLogger("QQ");
-dync.set("link", []);
 var sendMust = 0;
 wss.on('connection', (ws) => {
-    dync.change("link", (link) => {
-        ws.id = link.length;
-        logger.debug(`客户端 ${ws.id} 已连接`);
-        link.push(true);
-        return link;
-    })
+    logger.info("有客户端连接")
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
@@ -109,6 +103,7 @@ wss.on('connection', (ws) => {
             }
         }
         var _over_ = false;
+        if (space.content[back.type + back.id] == undefined) space.content[back.type + back.id] = space.prompt;
         eval(fs.readFileSync("./lib/menu.js").toString());
         if (_over_ == true) return;
         //询问器A
@@ -118,23 +113,19 @@ wss.on('connection', (ws) => {
         //4.得到 回答 后把 刚发的信息 和 回答 直接压入临时记忆
         //不要直接替换，只能压入，不然多个请求时会被盖住
         //刚发的信息 和 回答 同时压入临时记忆可以防止断裂
-        var content = dync.read("TemporaryContent")[back.type + back.id];
         if (back.type == "group") msg = data.sender.nickname + ":" + msg;
-        if (content == undefined) content = [];
-        //content是临时记忆
-        var queue = [];
-        //queue是要处理的信息
-        queue.push({
+        var prompt = [];
+        prompt.push({
             "role": "user",
             "content": msg
         });
         //询问器A
-        for (var i = 0; i < queue.length; i++) {
+        for (var i = 0; i < prompt.length; i++) {
             var tools, toolFunction;
 
             eval(fs.readFileSync("./lib/tools.js").toString());
             var question = await openai.chat.completions.create({
-                messages: [...dync.read("prompt"), ...content, ...queue],
+                messages: [...space.content[back.type + back.id], ...prompt],
                 model: config.model,
                 thinking: config.thinking,
                 reasoning_effort: config.reasoning_effort,
@@ -142,15 +133,14 @@ wss.on('connection', (ws) => {
                 user_id: "1",
                 tools: tools
             });
-            queue.push(question.choices[0].message);
-            logger.debug(question)
+            prompt.push(question.choices[0].message);
             i++
             reply(question.choices[0].message.content)
             if (question.choices[0].message.tool_calls != undefined) {
                 question.choices[0].message.tool_calls.forEach(item => {
                     Object.keys(toolFunction).forEach(_item => {
                         if (item.function.name == _item) {
-                            queue.push({
+                            prompt.push({
                                 role: "tool",
                                 tool_call_id: item.id,
                                 content: toolFunction[_item](
@@ -162,12 +152,31 @@ wss.on('connection', (ws) => {
                 })
                 i += question.choices[0].message.tool_calls.length - 1;
             }
+
+            space.content[back.type + back.id] = [...space.content[back.type + back.id], ...prompt]
+            space.completion_tokens += question.usage.completion_tokens
+            space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
+            space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
+            if (question.usage.total_tokens > config.returnToken) {
+                var tmp = await openai.chat.completions.create({
+                    messages: [
+                        {
+                            "role": "system",
+                            "content": fs.readFileSync("AI_Memory_System.md").toString()
+                                .replace(/\${system}/gi, JSON.stringify(space.prompt))
+                                .replace(/\${content}/gi, JSON.stringify(space.content[back.type + back.id]))
+                        }
+                    ],
+                    model: config.model,
+                    thinking: config.thinking,
+                    reasoning_effort: config.reasoning_effort,
+                    stream: config.stream,
+                    user_id: "1",
+                    tools: []
+                });
+                space.content[back.type + back.id] = [tmp.choices[0].message];
+            }
         }
-        dync.change("TemporaryContent", (tm) => {
-            if (tm[back.type + back.id] == undefined) tm[back.type + back.id] = [];
-            tm[back.type + back.id] = [...tm[back.type + back.id], ...queue]
-            return tm;
-        })
     });
 
     // 连接关闭
@@ -177,3 +186,6 @@ wss.on('connection', (ws) => {
 });
 
 logger.debug('WebSocket 服务端已启动');
+setInterval(() => {
+    fs.writeFileSync("space.json", JSON.stringify(space))
+}, config.saveTime)
