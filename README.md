@@ -77,14 +77,14 @@ prompt 用来储存系统提示词
     ]
 }
 ```
-### TemporaryMemory
+### TemporaryContent
 存放聊天记录
 
 每个聊天记录的键为`private/group+id`
 
 ```json
 {
-    "TemporaryMemory": {
+    "TemporaryContent": {
         "private123456": [],
         "group114514": [
             {
@@ -118,24 +118,7 @@ prompt 用来储存系统提示词
 
 (根目录下`.$`开头的文件为去掉该开头的文件的备份文件，执行 DE 时会进行替换)
 
-+ ._sealMemory.js
-
-封存聊天记录，封存的聊天记录不会加入AI的缓存中，
-
-封存的聊天记录储存在`sealedMemory.json`中
-
-**注:该操作会封存所有聊天聊天记录**
-
-+ ._clearMemory.js
-
-清除所有聊天记录，不同于封存，它不会留下任何记录
-
-+ ._checkNumber.js
-
-统计封存的聊天记录的信息条数
-
 # TODO
 + 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
-+ 完善菜单工具的说明
