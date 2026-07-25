@@ -33,7 +33,7 @@ log4js.configure({
 });
 const logger = log4js.getLogger("QQ");
 var sendMust = 0;
-if(fs.existsSync("prompt/system.md") == false)fs.writeFileSync("prompt/system.md","You are a helpful assistant.");
+if (fs.existsSync("prompt/system.md") == false) fs.writeFileSync("prompt/system.md", "You are a helpful assistant.");
 wss.on('connection', (ws) => {
     logger.info("有客户端连接")
     ws.on('message', async (data) => {
@@ -142,7 +142,7 @@ wss.on('connection', (ws) => {
                 tools: tools
             });
             prompt.push(question.choices[0].message);
-            i++
+            i++;
             reply(question.choices[0].message.content)
             if (question.choices[0].message.tool_calls != undefined) {
                 question.choices[0].message.tool_calls.forEach(item => {
@@ -155,6 +155,7 @@ wss.on('connection', (ws) => {
                                     JSON.parse(item.function.arguments)
                                 )
                             })
+                            if (toolFunction[_item]() == "skip") i++;
                         }
                     })
                 })
@@ -170,7 +171,7 @@ wss.on('connection', (ws) => {
                     messages: [
                         {
                             "role": "system",
-                            "content": fs.readFileSync("memory.md").toString()
+                            "content": fs.readFileSync("prompt/memory.md").toString()
                                 .replace(/\${system}/gi, JSON.stringify(fs.readFileSync("prompt/system.md").toString()))
                                 .replace(/\${content}/gi, JSON.stringify(space.content[back.type + back.id]))
                         }

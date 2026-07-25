@@ -47,7 +47,15 @@ at: @列表
 包含三个工具:
 + 用于联网搜索的 https/http
 + 用于发送表情的 emotion
+
 表情存在 ./emotion/ 下
++ 返回当前时间的 time
++ 请求执行指令的 cmdRequest
++ 写入文件的 writeFile
+### 提示词
+用空参数传入toolFunction
+若返回 "skip" 则跳过一次询问
+不处理可以返回 undefined
 
 ## 持久化变量
 space变量储存在 ./space.json 中
@@ -112,4 +120,3 @@ space变量储存在 ./space.json 中
 + 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
-+ 添加clearContent等
