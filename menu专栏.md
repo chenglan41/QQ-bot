@@ -10,7 +10,7 @@ menu 是独立于AI之外的功能
 ## .check
 确认运行状态，测试napcat是否被踢下线
 ## .token
-返回 Token 余额
+返回 Token 用量和余额
 ## .menu
 展示已有菜单功能
 ## .ban QQ号
@@ -21,3 +21,5 @@ menu 是独立于AI之外的功能
 保存space变量
 ## .clearExec
 清空space.exec队列
+## .clearContent
+清空当前群聊/私信的聊天记录

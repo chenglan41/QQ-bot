@@ -53,21 +53,6 @@ at: @列表
 space变量储存在 ./space.json 中
 
 可以在程序运行过程中修改文件是没用的
-
-### prompt
-prompt 用来储存系统提示词
-
-比如:
-```json
-{
-    "prompt": [
-        {
-            "role": "system",
-            "content": "你是一只猫娘..."
-        }
-    ]
-}
-```
 ### content
 存放聊天记录
 
@@ -128,4 +113,3 @@ prompt 用来储存系统提示词
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
 + 添加clearContent等
-+ prompt标准化

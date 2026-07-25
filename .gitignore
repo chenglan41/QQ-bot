@@ -3,3 +3,4 @@ node_modules/
 emotion/
 log/
 space.json
+prompt/system.md

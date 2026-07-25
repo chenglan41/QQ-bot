@@ -33,6 +33,7 @@ log4js.configure({
 });
 const logger = log4js.getLogger("QQ");
 var sendMust = 0;
+if(fs.existsSync("prompt/system.md") == false)fs.writeFileSync("prompt/system.md","You are a helpful assistant.");
 wss.on('connection', (ws) => {
     logger.info("有客户端连接")
     ws.on('message', async (data) => {
@@ -103,7 +104,14 @@ wss.on('connection', (ws) => {
             }
         }
         var _over_ = false;
-        if (space.content[back.type + back.id] == undefined) space.content[back.type + back.id] = space.prompt;
+        if (space.content[back.type + back.id] == undefined) {
+            space.content[back.type + back.id] = [
+                {
+                    "role": "system",
+                    "content": fs.readFileSync("prompt/system.md").toString()
+                }
+            ];
+        }
         eval(fs.readFileSync("./lib/menu.js").toString());
         if (_over_ == true) return;
         //询问器A
@@ -162,8 +170,8 @@ wss.on('connection', (ws) => {
                     messages: [
                         {
                             "role": "system",
-                            "content": fs.readFileSync("AI_Memory_System.md").toString()
-                                .replace(/\${system}/gi, JSON.stringify(space.prompt))
+                            "content": fs.readFileSync("memory.md").toString()
+                                .replace(/\${system}/gi, JSON.stringify(fs.readFileSync("prompt/system.md").toString()))
                                 .replace(/\${content}/gi, JSON.stringify(space.content[back.type + back.id]))
                         }
                     ],
