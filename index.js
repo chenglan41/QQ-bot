@@ -16,7 +16,7 @@ const openai = new OpenAI({
     baseURL: config.baseURL,
     apiKey: config.apiKey,
 });
-const wss = new WebSocketServer({ port: config.port });
+const wss = new WebSocketServer({ port: config.wsPort });
 log4js.configure({
     appenders: {
         System: {
@@ -43,7 +43,7 @@ wss.on('connection', (ws) => {
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
-        // logger.debug(data);
+        logger.debug(data.message);
         //记录返回ID和返回类型
         var back = {}
         if (data.group_id != undefined) {
@@ -174,7 +174,7 @@ wss.on('connection', (ws) => {
             space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
             space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
             space.TokenStatistics[back.type + back.id].push([new Date(),question.usage.total_tokens])
-            if (question.usage.total_tokens > config.returnToken) {
+            if (question.usage.total_tokens > config.returnToken && config.enableContent2Memory) {
                 var tmp = await openai.chat.completions.create({
                     messages: [
                         {

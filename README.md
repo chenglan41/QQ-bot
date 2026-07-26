@@ -21,7 +21,10 @@
     "sendMust":100,//随机回复信息中保底信息数(接收100条信息至少回复一条)
     "probability":0.01,//随机回复信息的概率
     "saveTime":100000,//space变量自动保存时间(ms)
-    "returnToken":300000//某次询问超过该tokens时自动将上下文转为记忆
+    "enableContent2Memory":true,//是否允许上下文自动转为记忆
+    "returnToken":300000,//某次询问超过该tokens时自动将上下文转为记忆
+    "httpPort":3000,//napcat的http服务器端口
+    "httpToken":""//napcat的http服务器令牌
 }
 ```
 ## 启动
@@ -126,11 +129,10 @@ space变量储存在 ./space.json 中
 + 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
-+ 加强提示词工程(比如在system.md声明如何查资料等信息)
-+ 禁言自动闭嘴(https://napcat.apifox.cn/226659300e0)
++ 加强提示词工程(比如在prompt/system.md声明如何查资料等信息)
 + 设置头衔(https://napcat.apifox.cn/226656931e0)
-+ 原子化，将能设置开启/关闭的选项独立出来
 + 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
-+ 接入浏览器，接入node-pty(或sandbox)
++ 原子化，将能设置开启/关闭的选项独立出来
 + 加入 debug 模式
++ 接入浏览器，接入node-pty(或sandbox)
 + Ai小镇（？）
