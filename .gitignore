@@ -4,3 +4,4 @@ emotion/
 log/
 space.json
 prompt/system.md
+lib/task.js

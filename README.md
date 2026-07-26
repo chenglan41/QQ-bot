@@ -28,6 +28,8 @@
 在Napcat Web UI 网络配置中添加一个`Websocket客户端`
 
 `node .`启动即可
+
+如果你发现缺失某些文件，可以试着先启动看看是否会补全
 ## 过滤器
 判断是否回复消息的函数储存在 filter 函数中
 
@@ -93,6 +95,20 @@ space变量储存在 ./space.json 中
 一个字符串数组，储存待执行的指令/写入文件操作
 ### completion_tokens,prompt_cache_hit_tokens,prompt_cache_miss_tokens
 分别表示 输出消耗的总token数,命中缓存的token数,未命中缓存的token数
+### TokenStatistics
+统计token在每个聊天记录的使用情况
+储存格式为
+```json
+{
+    "TokenStatistics":{
+        "type+id":[
+            ["时间","某次询问消耗的token"],
+            ["时间","某次询问消耗的token"],
+            ["时间","某次询问消耗的token"]
+        ]
+    }
+}
+```
 ## 记忆化
 当某次询问超过该tokens时自动将上下文转为记忆，
 
@@ -103,20 +119,18 @@ space变量储存在 ./space.json 中
 询问时会被替换为系统身份提示词
 ### ${content}
 询问时会被替换为上下文
-## 操作工具
-操作工具可以让你对聊天记录，环境进行更便捷的操作，通常以`._`开头
-
-使用`node ._XXX.js`或双击运行`._XXX.bat`即可运行
-
-+ ._DE.bat
-
-删除环境，用于重置log,emotion,config等，在拉取分支前可以执行
-
-通过代码您可以知道它的操作对象，以便排除是否在其他地方储存有敏感信息
-
-(根目录下`.$`开头的文件为去掉该开头的文件的备份文件，执行 DE 时会进行替换)
-
+## 定时任务
+定时任务储存在 lib/task.js
+客户端连接后每 24小时 触发一次
 # TODO
 + 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
 + 添加更多生成类 tool calls,比如表情包制作
 (不需要添加联网搜索类工具了，经实测，该机器人可以自己获取B站排行榜,新闻等)
++ 加强提示词工程(比如在system.md声明如何查资料等信息)
++ 禁言自动闭嘴(https://napcat.apifox.cn/226659300e0)
++ 设置头衔(https://napcat.apifox.cn/226656931e0)
++ 原子化，将能设置开启/关闭的选项独立出来
++ 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
++ 接入浏览器，接入node-pty(或sandbox)
++ 加入 debug 模式
++ Ai小镇（？）
