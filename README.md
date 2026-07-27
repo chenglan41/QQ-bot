@@ -24,7 +24,8 @@
     "enableContent2Memory":true,//是否允许上下文自动转为记忆
     "returnToken":300000,//某次询问超过该tokens时自动将上下文转为记忆
     "httpPort":3000,//napcat的http服务器端口
-    "httpToken":""//napcat的http服务器令牌
+    "httpToken":"",//napcat的http服务器令牌
+    "CountTokens":false//是否统计token使用情况
 }
 ```
 ## 启动
@@ -132,7 +133,6 @@ space变量储存在 ./space.json 中
 + 加强提示词工程(比如在prompt/system.md声明如何查资料等信息)
 + 设置头衔(https://napcat.apifox.cn/226656931e0)
 + 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
-+ 原子化，将能设置开启/关闭的选项独立出来
 + 加入 debug 模式
 + 接入浏览器，接入node-pty(或sandbox)
 + Ai小镇（？）

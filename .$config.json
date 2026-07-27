@@ -14,5 +14,6 @@
     "enableContent2Memory":true,
     "returnToken":300000,
     "httpPort":3000,
-    "httpToken":""
+    "httpToken":"",
+    "CountTokens":false
 }

@@ -32,7 +32,6 @@ log4js.configure({
     },
 });
 const logger = log4js.getLogger("QQ");
-var sendMust = 0;
 if (fs.existsSync("prompt/system.md") == false) fs.writeFileSync("prompt/system.md", "You are a helpful assistant.");
 if (fs.existsSync("lib/task.js") == false) fs.writeFileSync("lib/task.js", "//定时任务");
 wss.on('connection', (ws) => {
@@ -43,7 +42,7 @@ wss.on('connection', (ws) => {
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
-        logger.debug(data.message);
+        // logger.debug(data.message);
         //记录返回ID和返回类型
         var back = {}
         if (data.group_id != undefined) {
@@ -119,6 +118,9 @@ wss.on('connection', (ws) => {
         if (space.TokenStatistics[back.type + back.id] == undefined) {
             space.TokenStatistics[back.type + back.id] = [];
         }
+        if (space.sendMust[back.type + back.id] == undefined || space.sendMust[back.type + back.id] == null) {
+            space.sendMust[back.type + back.id] = 0;
+        }
         eval(fs.readFileSync("./lib/menu.js").toString());
         if (_over_ == true) return;
         //询问器A
@@ -173,7 +175,7 @@ wss.on('connection', (ws) => {
             space.completion_tokens += question.usage.completion_tokens
             space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
             space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
-            space.TokenStatistics[back.type + back.id].push([new Date(),question.usage.total_tokens])
+            if(config.CountTokens)space.TokenStatistics[back.type + back.id].push([new Date(),question.usage.total_tokens])
             if (question.usage.total_tokens > config.returnToken && config.enableContent2Memory) {
                 var tmp = await openai.chat.completions.create({
                     messages: [
