@@ -34,11 +34,18 @@ log4js.configure({
 const logger = log4js.getLogger("QQ");
 if (fs.existsSync("prompt/system.md") == false) fs.writeFileSync("prompt/system.md", "You are a helpful assistant.");
 if (fs.existsSync("lib/task.js") == false) fs.writeFileSync("lib/task.js", "//定时任务");
+
+// function urlToBase64Sync(url) {
+//     const buffer = execSync(`curl -s "${url}"`);
+//     const base64 = buffer.toString('base64');
+//     return base64;
+// }
+
 wss.on('connection', (ws) => {
     logger.info("有客户端连接")
-    setInterval(()=>{
+    setInterval(() => {
         eval(fs.readFileSync(("lib/task.js")).toString())
-    },24*60*60*1000)
+    }, 24 * 60 * 60 * 1000)
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
@@ -72,6 +79,7 @@ wss.on('connection', (ws) => {
                 }
             })
         }
+
         //过滤器
         var filter;
         eval(fs.readFileSync("./lib/filter.js").toString())
@@ -83,7 +91,7 @@ wss.on('connection', (ws) => {
             ) == false
         ) return;
         var reply = (content) => {
-            // logger.info(content)
+            logger.info(msg,content)
             if (content == "") return;//不发送空消息
             if (back.type == "private") {
                 ws.send(JSON.stringify({
@@ -108,12 +116,7 @@ wss.on('connection', (ws) => {
         }
         var _over_ = false;
         if (space.content[back.type + back.id] == undefined) {
-            space.content[back.type + back.id] = [
-                {
-                    "role": "system",
-                    "content": fs.readFileSync("prompt/system.md").toString()
-                }
-            ];
+            space.content[back.type + back.id] = [];
         }
         if (space.TokenStatistics[back.type + back.id] == undefined) {
             space.TokenStatistics[back.type + back.id] = [];
@@ -136,13 +139,22 @@ wss.on('connection', (ws) => {
             "role": "user",
             "content": msg
         });
+        // image recognition
+        // data.message.forEach(item => {
+        //     if (item.type == "image") {
+        //         prompt.unshift({ "type": "image_url", "image_url": { "url": item.data.url } });
+        //     }
+        // })
         //询问器A
         for (var i = 0; i < prompt.length; i++) {
             var tools, toolFunction;
 
             eval(fs.readFileSync("./lib/tools.js").toString());
             var question = await openai.chat.completions.create({
-                messages: [...space.content[back.type + back.id], ...prompt],
+                messages: [{
+                    "role": "system",
+                    "content": fs.readFileSync("prompt/system.md").toString()
+                }, ...space.content[back.type + back.id], ...prompt],
                 model: config.model,
                 thinking: config.thinking,
                 reasoning_effort: config.reasoning_effort,
@@ -175,7 +187,7 @@ wss.on('connection', (ws) => {
             space.completion_tokens += question.usage.completion_tokens
             space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
             space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
-            if(config.CountTokens)space.TokenStatistics[back.type + back.id].push([new Date(),question.usage.total_tokens])
+            if (config.CountTokens) space.TokenStatistics[back.type + back.id].push([new Date(), question.usage.total_tokens])
             if (question.usage.total_tokens > config.returnToken && config.enableContent2Memory) {
                 var tmp = await openai.chat.completions.create({
                     messages: [

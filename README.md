@@ -136,3 +136,8 @@ space变量储存在 ./space.json 中
 + 加入 debug 模式
 + 接入浏览器，接入node-pty(或sandbox)
 + Ai小镇（？）
++ 支持上传整段上下文
++ 支持每个群分别配置
+
++ claude-fable-5,glm-5.1 模型测试不通过
+
