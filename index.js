@@ -35,12 +35,6 @@ const logger = log4js.getLogger("QQ");
 if (fs.existsSync("prompt/system.md") == false) fs.writeFileSync("prompt/system.md", "You are a helpful assistant.");
 if (fs.existsSync("lib/task.js") == false) fs.writeFileSync("lib/task.js", "//定时任务");
 
-// function urlToBase64Sync(url) {
-//     const buffer = execSync(`curl -s "${url}"`);
-//     const base64 = buffer.toString('base64');
-//     return base64;
-// }
-
 wss.on('connection', (ws) => {
     logger.info("有客户端连接")
     setInterval(() => {
@@ -92,7 +86,7 @@ wss.on('connection', (ws) => {
         ) return;
         var reply = (content) => {
             logger.info(msg,content)
-            if (content == "") return;//不发送空消息
+            if (content == "" || content == null) return;//不发送空消息
             if (back.type == "private") {
                 ws.send(JSON.stringify({
                     "action": "send_private_msg",
@@ -140,11 +134,14 @@ wss.on('connection', (ws) => {
             "content": msg
         });
         // image recognition
-        // data.message.forEach(item => {
-        //     if (item.type == "image") {
-        //         prompt.unshift({ "type": "image_url", "image_url": { "url": item.data.url } });
-        //     }
-        // })
+        data.message.forEach(item => {
+            if (item.type == "image") {
+                prompt.unshift({
+            "role": "user",
+            "content": urlToBase64Sync(item.data.url)
+        });
+            }
+        })
         //询问器A
         for (var i = 0; i < prompt.length; i++) {
             var tools, toolFunction;
