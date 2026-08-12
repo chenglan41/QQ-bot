@@ -1,7 +1,9 @@
-config.json
-node_modules/
-emotion/
-log/
-space.json
-prompt/system.md
-lib/task.js
+/config.json
+/node_modules/
+/emotion/
+/log/
+/space.json
+/lib/task.js
+/model.json
+/data/*
+!/data/default/

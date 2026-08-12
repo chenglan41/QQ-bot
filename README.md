@@ -9,19 +9,11 @@
 存放在 config.json 中
 ```js
 {
-    "baseURL":"https://api.deepseek.com/",//API提供商
-    "apiKey":"",//SDK
     "maxLogSize":10485760,//最大日志长度(bytes)
-    "model":"deepseek-v4-flash",//模型
-    "thinking":{ "type": "disabled" },//是否开启思考模式
-    "reasoning_effort": "high",//思考强度
-    "stream": false,//流式加载(不建议开启)
     "port":8082,//websocket端口
     "uid":"",//QQ号
     "sendMust":100,//随机回复信息中保底信息数(接收100条信息至少回复一条)
     "probability":0.01,//随机回复信息的概率
-    "saveTime":100000,//space变量自动保存时间(ms)
-    "enableContent2Memory":true,//是否允许上下文自动转为记忆
     "returnToken":300000,//某次询问超过该tokens时自动将上下文转为记忆
     "httpPort":3000,//napcat的http服务器端口
     "httpToken":"",//napcat的http服务器令牌
@@ -50,14 +42,19 @@ at: @列表
 
 格式为 deepseek 的 tool calls
 
-包含三个工具:
-+ 用于联网搜索的 https/http
-+ 用于发送表情的 emotion
-
-表情存在 ./emotion/ 下
+包含以下工具:
 + 返回当前时间的 time
-+ 请求执行指令的 cmdRequest
-+ 写入文件的 writeFile
++ 用于发送表情的 emotion
+表情存在 ./emotion/ 下
++ AI发图片用的 sendImage
++ AI发视频用的 sendVideo
++ AI看图片用的 seeing_image
++ AI看视频用的 seeing_video
++ AI读取文件用的 readFile
++ AI读取文件用的 readFile
++ AI写文件用的 writeFile
++ AI下载文件文件用的 download
++ AI上网用的 visiting
 ### 提示词
 用空参数传入toolFunction
 若返回 "skip" 则跳过一次询问
@@ -67,52 +64,60 @@ at: @列表
 space变量储存在 ./space.json 中
 
 可以在程序运行过程中修改文件是没用的
-### content
-存放聊天记录
 
-每个聊天记录的键为`private/group+id`
-
-```json
-{
-    "content": {
-        "private123456": [],
-        "group114514": [
-            {
-                "role": "user",
-                "content": "橙蓝:行"
-            },
-            {
-                "role": "assistant",
-                "content": "主人~你是不是在看什么恋爱番或者玩什么角色扮演游戏呀？听起来好甜好纠结的剧情喵"
-            }
-        ]
-    }
-}
-```
+该部分需要 菜单功能.save 才能保存
 ### banned_user
 一个数字数组，表示禁止回复该用户的信息
 ### admin
 一个数字数组，表示管理员账户
 
 只有管理员才可以进行一些未经许可的操作，如在QQ内封存记忆等
-### exec
-一个字符串数组，储存待执行的指令/写入文件操作
 ### completion_tokens,prompt_cache_hit_tokens,prompt_cache_miss_tokens
 分别表示 输出消耗的总token数,命中缓存的token数,未命中缓存的token数
-### TokenStatistics
-统计token在每个聊天记录的使用情况
-储存格式为
+## 容器
+每个用户的对话储存在 ./data/:id 下
+
+其中 :id 表示用户类型(private/group)+用户id(群号/Q号)
+(default为模板)
+
++ config.json 为AI使用的模型配置
 ```json
 {
-    "TokenStatistics":{
-        "type+id":[
-            ["时间","某次询问消耗的token"],
-            ["时间","某次询问消耗的token"],
-            ["时间","某次询问消耗的token"]
-        ]
-    }
+    "model":"gpt",//聊天模型
+    "memorizing_model":"gpt",//记忆化模型
+    "seeing_model":"qwen-3.7-plus"//支持识别图片和视频的模型
 }
 ```
+这里的值代指一套模型配置，在 /model.json 中定义
+
+格式如下:
+```json
+{
+    "名字": [
+        {
+            "baseURL": "https://example.com",//AI接入网址
+            "apiKey": "sk-XXX"//apiKey
+        },
+        {
+            "model": "gpt-5.6-sol",//模型名
+            "thinking": {
+                "type": "enabled"
+            },
+            "reasoning_effort": "max"
+            //这里可以填写询问时的配置
+            //如千问支持enabled_search:true
+        },
+        {
+            "memory": 50000//某次询问超过该token则记忆化
+            //通常为模型上下文窗口大小的一半或3/4
+        }
+    ]
+}
+```
++ prompt/system.md 为 AI 的设定
++ prompt/memory.md 为持久记忆化的skill提示词
++ reply-x.json 为AI应答的聊天记录
++ content.txt 为完整的聊天记录
 ## 记忆化
 当某次询问超过该tokens时自动将上下文转为记忆，
 
@@ -132,17 +137,4 @@ space变量储存在 ./space.json 中
 + 设置头衔(https://napcat.apifox.cn/226656931e0)
 + 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
 + 加入 debug 模式
-+ 支持上传整段上下文
 + claude-fable-5,glm-5.1 模型测试不通过
-
-+ 接入浏览器，接入node-pty(或sandbox)
-+ Ai小镇（？）
-+ 支持每个群分别配置
-+ 修改操作工具使其操作对象缩小（只针对指定聊天记录修改）
--> 该部分可以整合为沙箱环境
-
-在此做出 2.0 设想，即以独立的环境为中心（1.0侧重同步异步调用问题和询问器的使用，2.0将侧重于虚拟环境的构建），
-
-支持执行指令和代码无需审核，
-
-并保留更多聊天软件接口

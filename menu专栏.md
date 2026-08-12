@@ -19,9 +19,3 @@ menu 是独立于AI之外的功能
 解除ban效果
 ## .save
 保存space变量
-## .clearExec
-清空space.exec队列
-## .clearContent
-清空当前群聊/私信的聊天记录
-## .model 模型名
-切换模型
