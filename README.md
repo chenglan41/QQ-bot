@@ -48,8 +48,6 @@ at: @列表
 表情存在 ./emotion/ 下
 + AI发图片用的 sendImage
 + AI发视频用的 sendVideo
-+ AI看图片用的 seeing_image
-+ AI看视频用的 seeing_video
 + AI读取文件用的 readFile
 + AI读取文件用的 readFile
 + AI写文件用的 writeFile
@@ -85,7 +83,6 @@ space变量储存在 ./space.json 中
 {
     "model":"gpt",//聊天模型
     "memorizing_model":"gpt",//记忆化模型
-    "seeing_model":"qwen-3.7-plus"//支持识别图片和视频的模型
 }
 ```
 这里的值代指一套模型配置，在 /model.json 中定义
@@ -108,7 +105,8 @@ space变量储存在 ./space.json 中
             //如千问支持enabled_search:true
         },
         {
-            "memory": 50000//某次询问超过该token则记忆化
+            "memory": 50000,//某次询问超过该token则记忆化
+            "enabled_seeing":true//是否为视觉模型，通常从模型提供商口中得知
             //通常为模型上下文窗口大小的一半或3/4
         }
     ]

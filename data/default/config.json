@@ -1,5 +1,4 @@
 {
-    "model":"gpt",
-    "memorizing_model":"gpt",
-    "seeing_model":"qwen-3.7-plus"
+    "model":"qwen-3.7-plus",
+    "memorizing_model":"qwen-3.7-plus"
 }

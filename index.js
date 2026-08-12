@@ -77,15 +77,15 @@ wss.on('connection', (ws) => {
                     msg += item.data.text;
                 }
                 else if (item.type == "at") {
-                    msg += `(@)[${item.data.qq}]`
+                    // msg += `(@)[${item.data.qq}]`
                     at.push(item.data.qq);
                 }
-                else if (item.type == "image") {
-                    msg += `(image)[${item.data.url}]`
-                }
-                else if (item.type == "video") {
-                    msg += `(video)[${item.data.url}]`
-                }
+                // else if (item.type == "image") {
+                //     msg += `(image)[${item.data.url}]`
+                // }
+                // else if (item.type == "video") {
+                //     msg += `(video)[${item.data.url}]`
+                // }
             })
         }
         if (msg == "" || msg == " " || msg == null) return //检查空消息
@@ -138,14 +138,26 @@ wss.on('connection', (ws) => {
             }
         }
         var _over_ = false;
-        if (space.TokenStatistics[back.type + back.id] == undefined) {
-            space.TokenStatistics[back.type + back.id] = [];
-        }
         if (space.sendMust[back.type + back.id] == undefined || space.sendMust[back.type + back.id] == null) {
             space.sendMust[back.type + back.id] = 0;
         }
         eval(fs.readFileSync("./lib/menu.js").toString());
         if (_over_ == true) return;
+        
+        if (model[boxConfig.model][2].enabled_seeing == true) {
+            msg = [
+                // { "type": "image_url", "image_url": { "url": val.url } },
+                { "type": "text", "text": msg }
+            ];
+            data.message.forEach(item => {
+                if (item.type == "image") {
+                    msg.push( { "type": "image_url", "image_url": { "url": item.data.url } })
+                }
+                else if (item.type == "video") {
+                    msg.push( { "type": "video_url", "video_url": { "url": item.data.url } })
+                }
+            })
+        }
         //询问器A
         //1.取出临时记忆并放到tmp
         //2.刚发的信息压入tmp
@@ -187,10 +199,11 @@ wss.on('connection', (ws) => {
                     Object.keys(toolFunction).forEach(_item => {
                         // logger.debug(JSON.parse(item.function.arguments))
                         if (item.function.name == _item) {
+                            var tmp = toolFunction[_item](JSON.parse(item.function.arguments));
                             prompt.push({
                                 role: "tool",
                                 tool_call_id: item.id,
-                                content: toolFunction[_item](JSON.parse(item.function.arguments))
+                                content: (typeof tmp == "string") ? tmp : ""
                             })
                             if (toolFunction[_item]() == "skip") i++;
                         }
