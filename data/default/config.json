@@ -1,4 +1,4 @@
 {
-    "model":"qwen-3.7-plus",
-    "memorizing_model":"qwen-3.7-plus"
+    "model":"ds2",
+    "memorizing_model":"ds2"
 }

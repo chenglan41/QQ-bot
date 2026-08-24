@@ -3,6 +3,7 @@
 ## 特点
 + 阻塞型(高情商:模拟真人回复速度;低情商:网页卡死直接死翘翘)
 + 支持多个Tool Call调用链
++ **工具调用自动触发下一轮询问**(Agent多轮循环，详见 AGENT.md)
 + 支持回复表情
 + 信息过滤器,tool call支持热更新
 ## 配置
@@ -53,6 +54,15 @@ at: @列表
 + AI写文件用的 writeFile
 + AI下载文件文件用的 download
 + AI上网用的 visiting
++ **AI Agent 沙盒工具**(虚拟终端+沙盒文件系统,共14个,详见 AGENT.md)
+### 多轮询问(Agent循环)
+AI 返回 tool_calls 时,**自动执行工具**并把结果发回给 AI 继续思考,
+直到 AI 不再调用工具(返回纯文本回答)才回复用户。
+
++ 单条消息最多循环 10 轮,防止 AI 无限调用工具(改 index.js 中 MAX_AGENT_ROUNDS)
++ AI 一次返回多个工具时会全部执行,结果一起发回
++ 工具结果作为 tool 消息写入 reply-x.json,成为长期记忆
+
 ### 提示词
 用空参数传入toolFunction
 若返回 "skip" 则跳过一次询问

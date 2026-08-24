@@ -1,0 +1,271 @@
+1:import OpenAI from "openai"
+2:import log4js from "log4js"
+3:import fs from "fs"
+4:import axios from "axios"
+5:import path from "path"
+6:import http from "http"
+7:import https from "https"
+8:import { WebSocketServer } from "ws"
+9:import { execSync } from "child_process"
+10:import { fileURLToPath } from 'url';
+11:import { dirname } from 'path';
+12:var space = JSON.parse(fs.readFileSync("space.json").toString());
+13:// 获取当前文件的完整路径（含文件名）
+14:const __filename = fileURLToPath(import.meta.url);
+15:// 获取当前文件所在目录
+16:const __dirname = dirname(__filename);
+17:const config = JSON.parse(fs.readFileSync("config.json").toString())
+18:const model = JSON.parse(fs.readFileSync("model.json").toString())
+19:function getPathSizeSync(p) {
+20:    let total = 0;
+21:    const stat = fs.statSync(p);
+22:    if (stat.isFile()) return stat.size;
+23:    for (const name of fs.readdirSync(p)) {
+24:        total += getPathSizeSync(path.join(p, name));
+25:    }
+26:    return total;
+27:}
+28:const wss = new WebSocketServer({ port: config.wsPort });
+29:log4js.configure({
+30:    appenders: {
+31:        System: {
+32:            type: "file",
+33:            filename: `./log/logger.log`,
+34:            maxLogSize: config.maxLogSize,
+35:            backups: 9999
+36:        },
+37:        Console: { type: "console" },
+38:    },
+39:    categories: {
+40:        default: { appenders: ["Console", "System"], level: "debug" }
+41:    },
+42:});
+43:const logger = log4js.getLogger("QQ");
+44:if (fs.existsSync("lib/task.js") == false) fs.writeFileSync("lib/task.js", "//定时任务");
+46:wss.on('connection', (ws) => {
+47:    logger.info("有客户端连接")
+48:    setInterval(() => {
+49:        eval(fs.readFileSync(("lib/task.js")).toString())
+50:    }, 24 * 60 * 60 * 1000)
+51:    ws.on('message', async (data) => {
+52:        //ws接收
+53:        data = JSON.parse(data.toString());
+54:        // logger.debug(data.message);
+55:        //记录返回ID和返回类型
+56:        var back = {}
+57:        if (data.group_id != undefined) {
+58:            back = {
+59:                type: "group",
+60:                id: data.group_id
+61:            }
+62:        }
+63:        else if (data.user_id != undefined) {
+64:            back = {
+65:                type: "private",
+66:                id: data.user_id
+67:            }
+68:        }
+69:        // logger.info(back)
+70:        // return
+71:        //记录信息
+72:        var msg = "";
+73:        var at = [];
+74:        if (data.message != undefined && typeof data.message == "object") {
+75:            data.message.forEach(item => {
+76:                if (item.type == "text") {
+77:                    msg += item.data.text;
+78:                }
+79:                else if (item.type == "at") {
+80:                    // msg += `(@)[${item.data.qq}]`
+81:                    at.push(item.data.qq);
+82:                }
+83:                // else if (item.type == "image") {
+84:                //     msg += `(image)[${item.data.url}]`
+85:                // }
+86:                // else if (item.type == "video") {
+87:                //     msg += `(video)[${item.data.url}]`
+88:                // }
+89:            })
+90:        }
+91:        if (msg == "" || msg == " " || msg == null) return //检查空消息
+92:        if (back.type == "group") msg = JSON.stringify({
+93:            "user": data.sender.nickname,
+94:            "msg": msg
+95:        });
+96:        var boxConfig;//临时解决cpSync失效问题
+97:        if (fs.existsSync(`./data/${back.type + back.id}`) == false) {
+98:            boxConfig = JSON.parse(fs.readFileSync(`./data/default/config.json`));
+99:            fs.cpSync(`./data/default/`, `./data/${back.type + back.id}/`, {
+100:                // 允许复制目录
+101:                recursive: true,
+102:                // 覆盖已存在文件
+103:                force: true
+104:            })
+105:        }
+106:        else boxConfig = JSON.parse(fs.readFileSync(`./data/${back.type + back.id}/config.json`));
+107:        fs.writeFileSync(`./data/${back.type + back.id}/content.txt`, msg + "\n", { flag: "a+" });
+108:        //过滤器
+109:        var filter;
+110:        eval(fs.readFileSync("./lib/filter.js").toString())
+111:        if (
+112:            filter(
+113:                back,
+114:                msg,
+115:                at
+116:            ) == false
+117:        ) return;
+119:        var reply = (content) => {
+120:            logger.info(msg, content)
+121:            if (content == "" || content == null) return;//不发送空消息
+122:            if (back.type == "private") {
+123:                ws.send(JSON.stringify({
+124:                    "action": "send_private_msg",
+125:                    "params": {
+126:                        "user_id": back.id,
+127:                        "message": content
+128:                    },
+129:                    "echo": ""
+130:                }));
+131:            }
+132:            else if (back.type == "group") {
+133:                ws.send(JSON.stringify({
+134:                    "action": "send_group_msg",
+135:                    "params": {
+136:                        "group_id": back.id,
+137:                        "message": content
+138:                    },
+139:                    "echo": ""
+140:                }));
+141:            }
+142:        }
+143:        var _over_ = false;
+144:        if (space.sendMust[back.type + back.id] == undefined || space.sendMust[back.type + back.id] == null) {
+145:            space.sendMust[back.type + back.id] = 0;
+146:        }
+147:        eval(fs.readFileSync("./lib/menu.js").toString());
+148:        if (_over_ == true) return;
+150:        if (model[boxConfig.model][2].enabled_seeing == true) {
+151:            msg = [
+152:                // { "type": "image_url", "image_url": { "url": val.url } },
+153:                { "type": "text", "text": msg }
+154:            ];
+155:            data.message.forEach(item => {
+156:                if (item.type == "image") {
+157:                    msg.push({ "type": "image_url", "image_url": { "url": item.data.url } })
+158:                }
+159:                else if (item.type == "video") {
+160:                    msg.push({ "type": "video_url", "video_url": { "url": item.data.url } })
+161:                }
+162:            })
+163:        }
+164:        //询问器A
+165:        //1.取出临时记忆并放到tmp
+166:        //2.刚发的信息压入tmp
+167:        //3.把tmp发给询问器A
+168:        //4.得到 回答 后把 刚发的信息 和 回答 直接压入临时记忆
+169:        //不要直接替换，只能压入，不然多个请求时会被盖住
+170:        //刚发的信息 和 回答 同时压入临时记忆可以防止断裂
+171:        var prompt = [];
+172:        prompt.push({
+173:            "role": "user",
+174:            "content": msg
+175:        })
+176:        //询问器A
+177:        for (var i = 0; i < prompt.length; i++) {
+178:            var tools, toolFunction;
+180:            eval(fs.readFileSync("./lib/tools.js").toString());
+181:            var openai = new OpenAI(model[boxConfig.model][0]);
+182:            try {
+183:                var question = await openai.chat.completions.create({
+184:                    messages: [
+185:                        {
+186:                            "role": "system",
+187:                            "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()
+188:                        },
+189:                        ...JSON.parse("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`, { flag: "a+" }).toString() + "]"),
+190:                        ...prompt
+191:                    ],
+192:                    ...model[boxConfig.model][1],
+193:                    stream: false,
+194:                    user_id: "1",
+195:                    tools: tools
+196:                });
+197:                prompt.push(question.choices[0].message);
+198:            }catch(e){
+199:                logger.error(e)
+200:            }
+201:            i++;
+202:            if(question.choices == undefined)break;
+203:            reply(question.choices[0].message.content)
+204:            if (question.choices[0].message.tool_calls != undefined) {
+205:                question.choices[0].message.tool_calls.forEach(item => {
+206:                    logger.debug(item.function.name);
+207:                    Object.keys(toolFunction).forEach(_item => {
+208:                        // logger.debug(JSON.parse(item.function.arguments))
+209:                        if (item.function.name == _item) {
+210:                            var tmp;
+211:                            try {
+212:                                tmp = toolFunction[_item](JSON.parse(item.function.arguments));
+213:                            } catch (e) {
+214:                                tmp = e.toString();
+215:                            }
+216:                            prompt.push({
+217:                                role: "tool",
+218:                                tool_call_id: item.id,
+219:                                content: (typeof tmp == "string") ? tmp : ""
+220:                            })
+221:                            if (toolFunction[_item]() == "skip") i++;
+222:                        }
+223:                    })
+224:                })
+225:                i += question.choices[0].message.tool_calls.length - 1;
+226:            }
+227:            prompt.forEach(item => {
+228:                fs.writeFileSync(
+229:                    `./data/${back.type + back.id}/reply-x.json`,
+230:                    (fs.statSync(`./data/${back.type + back.id}/reply-x.json`).size == 0 ? "" : ",\n") +
+231:                    JSON.stringify(item),
+232:                    { flag: "a+" }
+233:                )
+234:            })
+235:            prompt = []
+236:            space.completion_tokens += question.usage.completion_tokens
+237:            space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
+238:            space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
+239:            if (config.CountTokens) {
+240:                fs.writeFileSync(
+241:                    `./data/${back.type + back.id}/token.csv`,
+242:                    `${new Date()},${question.usage.total_tokens}`,
+243:                    { flag: "a+" }
+244:                )
+245:            }
+246:            // space.TokenStatistics[back.type + back.id].push([new Date(), question.usage.total_tokens])
+247:            if (question.usage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
+248:                var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
+249:                var tmp = await openai.chat.completions.create({
+250:                    messages: [
+251:                        {
+252:                            "role": "system",
+253:                            "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/memory.md`).toString()
+254:                                .replace(/\${system}/gi, JSON.stringify(fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()))
+255:                                .replace(/\${content}/gi, "[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
+256:                        }
+257:                    ],
+258:                    ...model[boxConfig.memorizing_model][1],
+259:                    stream: false,
+260:                    user_id: "1",
+261:                    tools: []
+262:                });
+263:                fs.writeFileSync(
+264:                    `./data/${back.type + back.id}/reply-x.json`,
+265:                    JSON.stringify(tmp.choices[0].message)
+266:                )
+267:            }
+268:        }
+269:    });
+271:    // 连接关闭
+272:    ws.on('close', () => {
+273:        logger.debug('客户端已断开连接');
+274:    });
+275:});
+277:logger.debug('WebSocket 服务端已启动');

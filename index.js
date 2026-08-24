@@ -9,6 +9,9 @@ import { WebSocketServer } from "ws"
 import { execSync } from "child_process"
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import * as Agent from "./lib/agent/agent.js"
+// 让 lib/tools.js（eval 执行）也能访问 Agent 模块
+globalThis.Agent = Agent;
 var space = JSON.parse(fs.readFileSync("space.json").toString());
 // 获取当前文件的完整路径（含文件名）
 const __filename = fileURLToPath(import.meta.url);
@@ -89,7 +92,10 @@ wss.on('connection', (ws) => {
             })
         }
         if (msg == "" || msg == " " || msg == null) return //检查空消息
-        if (back.type == "group") msg = data.sender.nickname + ":" + msg;
+        if (back.type == "group") msg = JSON.stringify({
+            "user": data.sender.nickname,
+            "msg": msg
+        });
         var boxConfig;//临时解决cpSync失效问题
         if (fs.existsSync(`./data/${back.type + back.id}`) == false) {
             boxConfig = JSON.parse(fs.readFileSync(`./data/default/config.json`));
@@ -143,7 +149,7 @@ wss.on('connection', (ws) => {
         }
         eval(fs.readFileSync("./lib/menu.js").toString());
         if (_over_ == true) return;
-        
+
         if (model[boxConfig.model][2].enabled_seeing == true) {
             msg = [
                 // { "type": "image_url", "image_url": { "url": val.url } },
@@ -151,10 +157,10 @@ wss.on('connection', (ws) => {
             ];
             data.message.forEach(item => {
                 if (item.type == "image") {
-                    msg.push( { "type": "image_url", "image_url": { "url": item.data.url } })
+                    msg.push({ "type": "image_url", "image_url": { "url": item.data.url } })
                 }
                 else if (item.type == "video") {
-                    msg.push( { "type": "video_url", "video_url": { "url": item.data.url } })
+                    msg.push({ "type": "video_url", "video_url": { "url": item.data.url } })
                 }
             })
         }
@@ -170,87 +176,121 @@ wss.on('connection', (ws) => {
             "role": "user",
             "content": msg
         })
-        //询问器A
-        for (var i = 0; i < prompt.length; i++) {
+        //询问器A：Agent 多轮循环（工具调用自动触发下一轮询问）
+        //AI 一旦返回 tool_calls，就执行对应工具并把结果发回给 AI 继续思考，
+        //直到 AI 不再调用工具给出最终回答，或达到最大轮数上限（防止无限循环）
+        var MAX_AGENT_ROUNDS = 10; // 单条消息最大 Agent 循环轮数，可按需调整
+        var lastUsage = null; // 记录最后一次询问的 token 用量（用于记忆化判断）
+        for (var i = 0; i < MAX_AGENT_ROUNDS; i++) {
             var tools, toolFunction;
-
+            //每次循环重新读取 lib/tools.js，支持热更新
             eval(fs.readFileSync("./lib/tools.js").toString());
             var openai = new OpenAI(model[boxConfig.model][0]);
-            var question = await openai.chat.completions.create({
-                messages: [
-                    {
-                        "role": "system",
-                        "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()
-                    },
-                    ...JSON.parse("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`, { flag: "a+" }).toString() + "]"),
-                    ...prompt
-                ],
-                ...model[boxConfig.model][1],
-                stream: false,
-                user_id: "1",
-                tools: tools
-            });
-            prompt.push(question.choices[0].message);
-            i++;
-            reply(question.choices[0].message.content)
-            if (question.choices[0].message.tool_calls != undefined) {
-                question.choices[0].message.tool_calls.forEach(item => {
-                    logger.info(item.function.name);
-                    Object.keys(toolFunction).forEach(_item => {
-                        // logger.debug(JSON.parse(item.function.arguments))
-                        if (item.function.name == _item) {
-                            var tmp = toolFunction[_item](JSON.parse(item.function.arguments));
-                            prompt.push({
-                                role: "tool",
-                                tool_call_id: item.id,
-                                content: (typeof tmp == "string") ? tmp : ""
-                            })
-                            if (toolFunction[_item]() == "skip") i++;
-                        }
-                    })
-                })
-                i += question.choices[0].message.tool_calls.length - 1;
-            }
-            prompt.forEach(item => {
-                fs.writeFileSync(
-                    `./data/${back.type + back.id}/reply-x.json`,
-                    (fs.statSync(`./data/${back.type + back.id}/reply-x.json`).size == 0 ? "" : ",\n") +
-                    JSON.stringify(item),
-                    { flag: "a+" }
-                )
-            })
-            space.completion_tokens += question.usage.completion_tokens
-            space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
-            space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
-            if (config.CountTokens) {
-                fs.writeFileSync(
-                    `./data/${back.type + back.id}/token.csv`,
-                    `${new Date()},${question.usage.total_tokens}`,
-                    { flag: "a+" }
-                )
-            }
-            space.TokenStatistics[back.type + back.id].push([new Date(), question.usage.total_tokens])
-            if (question.usage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
-                var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
-                var tmp = await openai.chat.completions.create({
+            var question;
+            try {
+                question = await openai.chat.completions.create({
                     messages: [
                         {
                             "role": "system",
-                            "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/memory.md`).toString()
-                                .replace(/\${system}/gi, JSON.stringify(fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()))
-                                .replace(/\${content}/gi, "[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
-                        }
+                            "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()
+                        },
+                        ...JSON.parse("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`, { flag: "a+" }).toString() + "]"),
+                        ...prompt
                     ],
-                    ...model[boxConfig.memorizing_model][1],
+                    ...model[boxConfig.model][1],
                     stream: false,
                     user_id: "1",
-                    tools: []
+                    tools: tools
                 });
-                fs.writeFileSync(
-                    `./data/${back.type + back.id}/reply-x.json`,
-                    JSON.stringify(tmp.choices[0].message)
-                )
+            } catch (e) {
+                logger.error(e)
+                break;
             }
+            if (question.choices == undefined) break;
+            var message = question.choices[0].message;
+            //AI 的回答（含工具调用请求）压入本轮对话
+            prompt.push(message);
+            //token 用量统计
+            if (question.usage != undefined) {
+                lastUsage = question.usage;
+                space.completion_tokens += question.usage.completion_tokens
+                space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
+                space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
+                if (config.CountTokens) {
+                    fs.writeFileSync(
+                        `./data/${back.type + back.id}/token.csv`,
+                        `${new Date()},${question.usage.total_tokens}`,
+                        { flag: "a+" }
+                    )
+                }
+            }
+            //没有工具调用：这就是最终回答，回复后结束循环
+            if (message.tool_calls == undefined || message.tool_calls.length == 0) {
+                reply(message.content);
+                break;
+            }
+            //有工具调用：先把 AI 的过程说明（如果有）发给用户，再执行工具
+            if (message.content != undefined && message.content != "") {
+                reply(message.content);
+            }
+            //执行全部工具调用，把结果压入本轮对话
+            var hasToolResult = false;
+            message.tool_calls.forEach(item => {
+                logger.debug(item.function.name);
+                var tmp = "";
+                if (toolFunction[item.function.name] != undefined) {
+                    try {
+                        tmp = toolFunction[item.function.name](JSON.parse(item.function.arguments));
+                    } catch (e) {
+                        tmp = e.toString();
+                    }
+                } else {
+                    tmp = `错误: 未知工具 ${item.function.name}`;
+                }
+                //兼容 skip 机制：工具返回 "skip" 时该轮不再追问
+                if (tmp == "skip") return;
+                prompt.push({
+                    role: "tool",
+                    tool_call_id: item.id,
+                    content: (typeof tmp == "string") ? tmp : ""
+                })
+                hasToolResult = true;
+            })
+            //没有任何工具结果（全部 skip 或工具未知），不再追问
+            if (hasToolResult == false) break;
+            //继续下一轮：把工具结果发回给 AI，自动触发下一轮询问
+        }
+        //把本轮全部对话（含工具调用与结果）压入临时记忆
+        prompt.forEach(item => {
+            fs.writeFileSync(
+                `./data/${back.type + back.id}/reply-x.json`,
+                (fs.statSync(`./data/${back.type + back.id}/reply-x.json`).size == 0 ? "" : ",\n") +
+                JSON.stringify(item),
+                { flag: "a+" }
+            )
+        })
+        prompt = []
+        //记忆化：上下文超限时用记忆模型压缩历史
+        if (lastUsage != null && lastUsage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
+            var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
+            var tmp = await openai.chat.completions.create({
+                messages: [
+                    {
+                        "role": "system",
+                        "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/memory.md`).toString()
+                            .replace(/\${system}/gi, JSON.stringify(fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()))
+                            .replace(/\${content}/gi, "[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
+                    }
+                ],
+                ...model[boxConfig.memorizing_model][1],
+                stream: false,
+                user_id: "1",
+                tools: []
+            });
+            fs.writeFileSync(
+                `./data/${back.type + back.id}/reply-x.json`,
+                JSON.stringify(tmp.choices[0].message)
+            )
         }
     });
 
