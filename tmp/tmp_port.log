@@ -1,4 +1,0 @@
-  TCP    0.0.0.0:8082           0.0.0.0:0              LISTENING       9496
-  TCP    [::]:8082              [::]:0                 LISTENING       9496
-  TCP    [::1]:8082             [::1]:55970            ESTABLISHED     9496
-  TCP    [::1]:55970            [::1]:8082             ESTABLISHED     16296
