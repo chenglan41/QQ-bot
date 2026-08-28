@@ -18,7 +18,12 @@
     "returnToken":300000,//某次询问超过该tokens时自动将上下文转为记忆
     "httpPort":3000,//napcat的http服务器端口
     "httpToken":"",//napcat的http服务器令牌
-    "CountTokens":false//是否统计token使用情况
+    "CountTokens":false,//是否统计token使用情况
+    "completion_tokens": 999999999999,//回复token剩余量(该部分会自动扣除)
+    "prompt_cache_hit_tokens": 999999999999,//输入缓存命中token剩余量(该部分会自动扣除)
+    "prompt_cache_miss_tokens": 999999999999,//输入缓存未命中token剩余量(该部分会自动扣除)
+    "banned_user": [],//拉黑的QQ号
+    "admin":[]//机器人管理员的QQ号
 }
 ```
 ## 启动
@@ -67,21 +72,6 @@ AI 返回 tool_calls 时,**自动执行工具**并把结果发回给 AI 继续�
 用空参数传入toolFunction
 若返回 "skip" 则跳过一次询问
 不处理可以返回 undefined
-
-## 持久化变量
-space变量储存在 ./space.json 中
-
-可以在程序运行过程中修改文件是没用的
-
-该部分需要 菜单功能.save 才能保存
-### banned_user
-一个数字数组，表示禁止回复该用户的信息
-### admin
-一个数字数组，表示管理员账户
-
-只有管理员才可以进行一些未经许可的操作，如在QQ内封存记忆等
-### completion_tokens,prompt_cache_hit_tokens,prompt_cache_miss_tokens
-分别表示 输出消耗的总token数,命中缓存的token数,未命中缓存的token数
 ## 容器
 每个用户的对话储存在 ./data/:id 下
 
@@ -146,5 +136,5 @@ space变量储存在 ./space.json 中
 + 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
 + 加入 debug 模式
 + claude-fable-5,glm-5.1 模型测试不通过
-+ 继续原子化
 + 添加AI自动找话题功能
++ 推进原子化

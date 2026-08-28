@@ -12,21 +12,21 @@ import { dirname } from 'path';
 import * as Agent from "./lib/agent/agent.js"
 // 让 lib/tools.js（eval 执行）也能访问 Agent 模块
 globalThis.Agent = Agent;
-var space = JSON.parse(fs.readFileSync("space.json").toString());
+var sendMust = {
+};
 // 获取当前文件的完整路径（含文件名）
 const __filename = fileURLToPath(import.meta.url);
 // 获取当前文件所在目录
 const __dirname = dirname(__filename);
 const config = JSON.parse(fs.readFileSync("config.json").toString())
 const model = JSON.parse(fs.readFileSync("model.json").toString())
-function getPathSizeSync(p) {
-    let total = 0;
-    const stat = fs.statSync(p);
-    if (stat.isFile()) return stat.size;
-    for (const name of fs.readdirSync(p)) {
-        total += getPathSizeSync(path.join(p, name));
+function isJson(str) {
+    try {
+        JSON.parse(str);
+        return true;
+    } catch {
+        return false;
     }
-    return total;
 }
 const wss = new WebSocketServer({ port: config.wsPort });
 log4js.configure({
@@ -51,9 +51,9 @@ wss.on('connection', (ws) => {
     setInterval(() => {
         eval(fs.readFileSync(("lib/task.js")).toString())
     }, 24 * 60 * 60 * 1000)
-    setInterval(()=>{
-        
-    },60000)
+    setInterval(() => {
+
+    }, 60000)
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
@@ -77,6 +77,7 @@ wss.on('connection', (ws) => {
         //记录信息
         var msg = "";
         var at = [];
+
         if (data.message != undefined && typeof data.message == "object") {
             data.message.forEach(item => {
                 if (item.type == "text") {
@@ -95,6 +96,45 @@ wss.on('connection', (ws) => {
             })
         }
         if (msg == "" || msg == " " || msg == null) return //检查空消息
+        var reply = (content) => {
+            // setTimeout(() => {
+            logger.info(msg, content)
+            if (content == "" || content == null) return;//不发送空消息
+            if (back.type == "private") {
+                ws.send(JSON.stringify({
+                    "action": "send_private_msg",
+                    "params": {
+                        "user_id": back.id,
+                        "message": content
+                    },
+                    "echo": ""
+                }));
+            }
+            else if (back.type == "group") {
+                ws.send(JSON.stringify({
+                    "action": "send_group_msg",
+                    "params": {
+                        "group_id": back.id,
+                        "message": [
+                            // { type: 'at', data: { qq: data.sender.user_id.toString() } },
+                            // {
+                            //     "type": "reply",
+                            //     "data": {
+                            //         "id": "string",
+                            //         "seq": data.message_seq
+                            //     }
+                            // },
+                            (typeof content == "string") ? { type: 'text', data: { text: content } } : content
+                        ]
+                    },
+                    "echo": ""
+                }));
+            }
+            // }, 3000)
+        }
+
+        var _over_ = false;
+        if (msg[0] == "#") eval(fs.readFileSync("./lib/menu.js").toString());
         if (back.type == "group") msg = JSON.stringify({
             "user": data.sender.nickname,
             "msg": msg
@@ -108,8 +148,19 @@ wss.on('connection', (ws) => {
                 // 覆盖已存在文件
                 force: true
             })
+        }        //保护AI模型名
+        else {
+            //沙箱错误保护
+            if (!fs.existsSync(`./data/${back.type + back.id}/config.json`) ||
+                !fs.statSync(`./data/${back.type + back.id}/config.json`).isFile() ||
+                !isJson(fs.readFileSync(`./data/${back.type + back.id}/config.json`).toString())
+            ) {
+                fs.rmSync(`./data/${back.type + back.id}/prompt`, { recursive: true, force: true });
+                fs.copyFileSync(`./data/default/config.json`, `./data/${back.type + back.id}/config.json`)
+                logger.warn(`./data/${back.type + back.id}/config.json 出现问题，已修复`)
+            }
+            boxConfig = JSON.parse(fs.readFileSync(`./data/${back.type + back.id}/config.json`).toString());
         }
-        else boxConfig = JSON.parse(fs.readFileSync(`./data/${back.type + back.id}/config.json`));
         fs.writeFileSync(`./data/${back.type + back.id}/content.txt`, msg + "\n", { flag: "a+" });
         //过滤器
         var filter;
@@ -122,49 +173,16 @@ wss.on('connection', (ws) => {
             ) == false
         ) return;
 
-        var reply = (content) => {
-            // setTimeout(() => {
-                logger.info(msg, content)
-                if (content == "" || content == null) return;//不发送空消息
-                if (back.type == "private") {
-                    ws.send(JSON.stringify({
-                        "action": "send_private_msg",
-                        "params": {
-                            "user_id": back.id,
-                            "message": content
-                        },
-                        "echo": ""
-                    }));
-                }
-                else if (back.type == "group") {
-                    ws.send(JSON.stringify({
-                        "action": "send_group_msg",
-                        "params": {
-                            "group_id": back.id,
-                            "message": [
-                                // { type: 'at', data: { qq: data.sender.user_id.toString() } },
-                                // {
-                                //     "type": "reply",
-                                //     "data": {
-                                //         "id": "string",
-                                //         "seq": data.message_seq
-                                //     }
-                                // },
-                                (typeof content == "string") ? { type: 'text', data: { text: content } } : content
-                            ]
-                        },
-                        "echo": ""
-                    }));
-                }
-            // }, 3000)
-        }
-        var _over_ = false;
-        if (space.sendMust[back.type + back.id] == undefined || space.sendMust[back.type + back.id] == null) {
-            space.sendMust[back.type + back.id] = 0;
-        }
-        eval(fs.readFileSync("./lib/menu.js").toString());
-        if (_over_ == true) return;
 
+        if (sendMust[back.type + back.id] == undefined || sendMust[back.type + back.id] == null) {
+            sendMust[back.type + back.id] = 0;
+        }
+        if (_over_ == true) return;
+        //沙箱错误保护
+        if (typeof boxConfig.model != "string" || model[boxConfig.model] == undefined) {
+            boxConfig.model = JSON.stringify(fs.readFileSync("./data/default/config.json").toString()).model;
+            logger.warn(`模型名出现问题，将使用默认模型名`)
+        }
         if (model[boxConfig.model][2].enabled_seeing == true) {
             msg = [
                 // { "type": "image_url", "image_url": { "url": val.url } },
@@ -200,10 +218,43 @@ wss.on('connection', (ws) => {
         for (var i = 0; i < MAX_AGENT_ROUNDS; i++) {
             var tools, toolFunction;
             //每次循环重新读取 lib/tools.js，支持热更新
+
             eval(fs.readFileSync("./lib/tools.js").toString());
             var openai = new OpenAI(model[boxConfig.model][0]);
             var question;
             try {
+                //沙箱错误保护
+                if (!fs.existsSync(`./data/${back.type + back.id}/prompt`) ||
+                    !fs.statSync(`./data/${back.type + back.id}/prompt`).isDirectory()
+                ) {
+                    fs.rmSync(`./data/${back.type + back.id}/prompt`, { recursive: true, force: true });
+                    fs.cpSync(`./data/default/prompt`, `./data/${back.type + back.id}/prompt`, {
+                        // 允许复制目录
+                        recursive: true,
+                        // 覆盖已存在文件
+                        force: true
+                    })
+                    logger.warn(`./data/${back.type + back.id}/prompt 出现问题，已修复`)
+                }
+                //沙箱错误保护
+                if (!fs.existsSync(`./data/${back.type + back.id}/prompt/system.md`) ||
+                    !fs.statSync(`./data/${back.type + back.id}/prompt/system.md`).isFile()
+                ) {
+                    fs.rmSync(`./data/${back.type + back.id}/prompt/system.md`, { recursive: true, force: true });
+                    fs.cpSync(`./data/default/prompt/system.md`, `./data/${back.type + back.id}/prompt/system.md`, {
+                        // 覆盖已存在文件
+                        force: true
+                    })
+                    logger.warn(`./data/${back.type + back.id}/prompt/system.md 出现问题，已修复`)
+                }
+                //沙箱错误保护
+                if (!fs.existsSync(`./data/${back.type + back.id}/reply-x.json`) ||
+                    !fs.statSync(`./data/${back.type + back.id}/reply-x.json`).isFile() ||
+                    !isJson("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
+                ) {
+                    fs.rmSync(`./data/${back.type + back.id}/reply-x.json`, { recursive: true, force: true })
+                    logger.warn(`./data/${back.type + back.id}/reply-x.json 出现问题，已修复`)
+                }
                 question = await openai.chat.completions.create({
                     messages: [
                         {
@@ -229,9 +280,10 @@ wss.on('connection', (ws) => {
             //token 用量统计
             if (question.usage != undefined) {
                 lastUsage = question.usage;
-                space.completion_tokens += question.usage.completion_tokens
-                space.prompt_cache_hit_tokens += question.usage.prompt_cache_hit_tokens
-                space.prompt_cache_miss_tokens += question.usage.prompt_cache_miss_tokens
+                config.completion_tokens -= question.usage.completion_tokens
+                config.prompt_cache_hit_tokens -= question.usage.prompt_cache_hit_tokens
+                config.prompt_cache_miss_tokens -= question.usage.prompt_cache_miss_tokens
+                fs.writeFileSync("./config.json", JSON.stringify(config));
                 if (config.CountTokens) {
                     fs.writeFileSync(
                         `./data/${back.type + back.id}/token.csv`,
@@ -289,6 +341,17 @@ wss.on('connection', (ws) => {
         //记忆化：上下文超限时用记忆模型压缩历史
         if (lastUsage != null && lastUsage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
             var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
+            //沙箱错误保护
+            if (!fs.existsSync(`./data/${back.type + back.id}/prompt/memory.md`) ||
+                !fs.statSync(`./data/${back.type + back.id}/prompt/memory.md`).isFile()
+            ) {
+                fs.rmSync(`./data/${back.type + back.id}/prompt/memory.md`, { recursive: true, force: true });
+                fs.cpSync(`./data/default/prompt/memory.md`, `./data/${back.type + back.id}/prompt/memory.md`, {
+                    // 覆盖已存在文件
+                    force: true
+                })
+                logger.warn(`./data/${back.type + back.id}/prompt/memory.md 出现问题，已修复`)
+            }
             var tmp = await openai.chat.completions.create({
                 messages: [
                     {

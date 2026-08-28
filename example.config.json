@@ -1,0 +1,16 @@
+{
+    "maxLogSize":10485760,
+    "port":8082,
+    "uid":"",
+    "sendMust":100,
+    "probability":0.01,
+    "returnToken":300000,
+    "httpPort":3000,
+    "httpToken":"",
+    "CountTokens":false,
+    "completion_tokens": 999999999999,
+    "prompt_cache_hit_tokens": 999999999999,
+    "prompt_cache_miss_tokens": 999999999999,
+    "banned_user": [],
+    "admin":[]
+}

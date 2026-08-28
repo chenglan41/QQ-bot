@@ -1,4 +1,6 @@
 {
     "model":"ds2",
-    "memorizing_model":"ds2"
+    "memorizing_model":"ds2",
+    "sendMust":100,
+    "probability":0.01
 }
