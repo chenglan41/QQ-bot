@@ -51,10 +51,13 @@ wss.on('connection', (ws) => {
     setInterval(() => {
         eval(fs.readFileSync(("lib/task.js")).toString())
     }, 24 * 60 * 60 * 1000)
+    setInterval(()=>{
+        
+    },60000)
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
-        // logger.debug(data.message);
+        // logger.debug(JSON.stringify(data.message))
         //记录返回ID和返回类型
         var back = {}
         if (data.group_id != undefined) {
@@ -120,28 +123,40 @@ wss.on('connection', (ws) => {
         ) return;
 
         var reply = (content) => {
-            logger.info(msg, content)
-            if (content == "" || content == null) return;//不发送空消息
-            if (back.type == "private") {
-                ws.send(JSON.stringify({
-                    "action": "send_private_msg",
-                    "params": {
-                        "user_id": back.id,
-                        "message": content
-                    },
-                    "echo": ""
-                }));
-            }
-            else if (back.type == "group") {
-                ws.send(JSON.stringify({
-                    "action": "send_group_msg",
-                    "params": {
-                        "group_id": back.id,
-                        "message": content
-                    },
-                    "echo": ""
-                }));
-            }
+            // setTimeout(() => {
+                logger.info(msg, content)
+                if (content == "" || content == null) return;//不发送空消息
+                if (back.type == "private") {
+                    ws.send(JSON.stringify({
+                        "action": "send_private_msg",
+                        "params": {
+                            "user_id": back.id,
+                            "message": content
+                        },
+                        "echo": ""
+                    }));
+                }
+                else if (back.type == "group") {
+                    ws.send(JSON.stringify({
+                        "action": "send_group_msg",
+                        "params": {
+                            "group_id": back.id,
+                            "message": [
+                                // { type: 'at', data: { qq: data.sender.user_id.toString() } },
+                                // {
+                                //     "type": "reply",
+                                //     "data": {
+                                //         "id": "string",
+                                //         "seq": data.message_seq
+                                //     }
+                                // },
+                                (typeof content == "string") ? { type: 'text', data: { text: content } } : content
+                            ]
+                        },
+                        "echo": ""
+                    }));
+                }
+            // }, 3000)
         }
         var _over_ = false;
         if (space.sendMust[back.type + back.id] == undefined || space.sendMust[back.type + back.id] == null) {
@@ -171,6 +186,7 @@ wss.on('connection', (ws) => {
         //4.得到 回答 后把 刚发的信息 和 回答 直接压入临时记忆
         //不要直接替换，只能压入，不然多个请求时会被盖住
         //刚发的信息 和 回答 同时压入临时记忆可以防止断裂
+        // if(data.message[0].type == "face")logger.debug(data.message[0].data.raw)
         var prompt = [];
         prompt.push({
             "role": "user",
@@ -219,7 +235,7 @@ wss.on('connection', (ws) => {
                 if (config.CountTokens) {
                     fs.writeFileSync(
                         `./data/${back.type + back.id}/token.csv`,
-                        `${new Date()},${question.usage.total_tokens}`,
+                        `${new Date()},${question.usage.total_tokens}\n`,
                         { flag: "a+" }
                     )
                 }

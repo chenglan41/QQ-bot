@@ -146,3 +146,5 @@ space变量储存在 ./space.json 中
 + 点赞(https://napcat.apifox.cn/226656717e0,https://napcat.apifox.cn/226659197e0)
 + 加入 debug 模式
 + claude-fable-5,glm-5.1 模型测试不通过
++ 继续原子化
++ 添加AI自动找话题功能
