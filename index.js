@@ -391,7 +391,7 @@ wss.on('connection', (ws) => {
         })
         prompt = []
         //记忆化：上下文超限时用记忆模型压缩历史
-        if (lastUsage != null && lastUsage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
+        if (lastUsage != null && lastUsage.total_tokens > model[boxConfig.model][2].memory) {
             var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
             // 沙箱保护：memory.md
             ensurePromptFile(sessionPath, "memory.md");
