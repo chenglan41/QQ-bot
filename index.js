@@ -28,6 +28,108 @@ function isJson(str) {
         return false;
     }
 }
+// ==================== 沙箱保护函数 ====================
+/**
+ * 沙箱保护：检查并修复 config.json
+ * @param {string} sessionPath - 会话路径，如 "./data/group123456"
+ * @param {object} defaultConfig - 默认配置对象
+ * @returns {object} 解析后的配置对象
+ */
+function ensureConfigJson(sessionPath, defaultConfig) {
+    if (
+        !fs.existsSync(`${sessionPath}/config.json`) ||
+        !fs.statSync(`${sessionPath}/config.json`).isFile() ||
+        !isJson(fs.readFileSync(`${sessionPath}/config.json`).toString())
+    ) {
+        fs.rmSync(`${sessionPath}/prompt`, { recursive: true, force: true });
+        fs.copyFileSync(`./data/default/config.json`, `${sessionPath}/config.json`)
+        logger.warn(`${sessionPath}/config.json 出现问题，已修复`)
+    }
+    return JSON.parse(fs.readFileSync(`${sessionPath}/config.json`).toString());
+}
+
+/**
+ * 沙箱保护：检查并修复会话配置中的关键字段
+ * 包括：model（模型名）、sendMust（必须发送次数）、probability（回复概率）
+ * @param {object} boxConfig - 当前会话配置
+ * @param {object} modelMap - 模型映射表
+ */
+function ensureBoxConfigFields(boxConfig, modelMap) {
+    const defaultBox = JSON.parse(fs.readFileSync("./data/default/config.json").toString());
+    // 保护 memorizing_model
+    if (typeof boxConfig.model != "string" || modelMap[boxConfig.memorizing_model] == undefined) {
+        boxConfig.memorizing_model = defaultBox.memorizing_model;
+        logger.warn(`模型名出现问题，将使用默认模型名: ${boxConfig.memorizing_model}`)
+    }
+    // 保护 model
+    if (typeof boxConfig.model != "string" || modelMap[boxConfig.model] == undefined) {
+        boxConfig.model = defaultBox.model;
+        logger.warn(`模型名出现问题，将使用默认模型名: ${boxConfig.model}`)
+    }
+    // 保护 sendMust
+    if (typeof boxConfig.sendMust != "number" || boxConfig.sendMust < 0 || !Number.isInteger(boxConfig.sendMust)) {
+        boxConfig.sendMust = defaultBox.sendMust;
+        logger.warn(`sendMust 出现问题，将使用默认值: ${boxConfig.sendMust}`)
+    }
+    // 保护 probability
+    if (typeof boxConfig.probability != "number" || boxConfig.probability < 0 || boxConfig.probability > 1) {
+        boxConfig.probability = defaultBox.probability;
+        logger.warn(`probability 出现问题，将使用默认值: ${boxConfig.probability}`)
+    }
+}
+
+/**
+ * 沙箱保护：检查并修复 prompt 目录
+ * @param {string} sessionPath - 会话路径
+ */
+function ensurePromptDir(sessionPath) {
+    if (
+        !fs.existsSync(`${sessionPath}/prompt`) ||
+        !fs.statSync(`${sessionPath}/prompt`).isDirectory()
+    ) {
+        fs.rmSync(`${sessionPath}/prompt`, { recursive: true, force: true });
+        fs.cpSync(`./data/default/prompt`, `${sessionPath}/prompt`, {
+            recursive: true,
+            force: true
+        })
+        logger.warn(`${sessionPath}/prompt 出现问题，已修复`)
+    }
+}
+
+/**
+ * 沙箱保护：检查并修复 prompt 目录下的指定文件（如 system.md、memory.md）
+ * @param {string} sessionPath - 会话路径
+ * @param {string} fileName - 文件名，如 "system.md"、"memory.md"
+ */
+function ensurePromptFile(sessionPath, fileName) {
+    if (
+        !fs.existsSync(`${sessionPath}/prompt/${fileName}`) ||
+        !fs.statSync(`${sessionPath}/prompt/${fileName}`).isFile()
+    ) {
+        fs.rmSync(`${sessionPath}/prompt/${fileName}`, { recursive: true, force: true });
+        fs.cpSync(`./data/default/prompt/${fileName}`, `${sessionPath}/prompt/${fileName}`, {
+            force: true
+        })
+        logger.warn(`${sessionPath}/prompt/${fileName} 出现问题，已修复`)
+    }
+}
+
+/**
+ * 沙箱保护：检查并修复 reply-x.json 文件
+ * @param {string} sessionPath - 会话路径
+ */
+function ensureReplyXJson(sessionPath) {
+    if (
+        !fs.existsSync(`${sessionPath}/reply-x.json`) ||
+        !fs.statSync(`${sessionPath}/reply-x.json`).isFile() ||
+        !isJson("[" + fs.readFileSync(`${sessionPath}/reply-x.json`).toString() + "]")
+    ) {
+        fs.rmSync(`${sessionPath}/reply-x.json`, { recursive: true, force: true })
+        logger.warn(`${sessionPath}/reply-x.json 出现问题，已修复`)
+    }
+}
+// ====================================================
+
 const wss = new WebSocketServer({ port: config.wsPort });
 log4js.configure({
     appenders: {
@@ -51,9 +153,6 @@ wss.on('connection', (ws) => {
     setInterval(() => {
         eval(fs.readFileSync(("lib/task.js")).toString())
     }, 24 * 60 * 60 * 1000)
-    setInterval(() => {
-
-    }, 60000)
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
@@ -139,32 +238,28 @@ wss.on('connection', (ws) => {
             "user": data.sender.nickname,
             "msg": msg
         });
-        var boxConfig;//临时解决cpSync失效问题
-        if (fs.existsSync(`./data/${back.type + back.id}`) == false) {
+        var sessionPath = `./data/${back.type + back.id}`;
+        var boxConfig;
+        if (fs.existsSync(sessionPath) == false) {
             boxConfig = JSON.parse(fs.readFileSync(`./data/default/config.json`));
-            fs.cpSync(`./data/default/`, `./data/${back.type + back.id}/`, {
-                // 允许复制目录
+            fs.cpSync(`./data/default/`, sessionPath, {
                 recursive: true,
-                // 覆盖已存在文件
                 force: true
             })
-        }        //保护AI模型名
-        else {
-            //沙箱错误保护
-            if (!fs.existsSync(`./data/${back.type + back.id}/config.json`) ||
-                !fs.statSync(`./data/${back.type + back.id}/config.json`).isFile() ||
-                !isJson(fs.readFileSync(`./data/${back.type + back.id}/config.json`).toString())
-            ) {
-                fs.rmSync(`./data/${back.type + back.id}/prompt`, { recursive: true, force: true });
-                fs.copyFileSync(`./data/default/config.json`, `./data/${back.type + back.id}/config.json`)
-                logger.warn(`./data/${back.type + back.id}/config.json 出现问题，已修复`)
-            }
-            boxConfig = JSON.parse(fs.readFileSync(`./data/${back.type + back.id}/config.json`).toString());
+        } else {
+            // 沙箱保护：config.json
+            boxConfig = ensureConfigJson(sessionPath, config);
         }
-        fs.writeFileSync(`./data/${back.type + back.id}/content.txt`, msg + "\n", { flag: "a+" });
+        // 沙箱保护：会话配置关键字段（model / sendMust / probability）
+        ensureBoxConfigFields(boxConfig, model);
+        // 将会话配置中的 sendMust 和 probability 同步到全局 config（供 filter.js 使用）
+        fs.writeFileSync(`${sessionPath}/content.txt`, msg + "\n", { flag: "a+" });
         //过滤器
         var filter;
         eval(fs.readFileSync("./lib/filter.js").toString())
+        if (sendMust[back.type + back.id] == undefined || sendMust[back.type + back.id] == null || sendMust[back.type + back.id] == NaN) {
+            sendMust[back.type + back.id] = 0;
+        }
         if (
             filter(
                 back,
@@ -172,20 +267,10 @@ wss.on('connection', (ws) => {
                 at
             ) == false
         ) return;
-
-
-        if (sendMust[back.type + back.id] == undefined || sendMust[back.type + back.id] == null) {
-            sendMust[back.type + back.id] = 0;
-        }
         if (_over_ == true) return;
-        //沙箱错误保护
-        if (typeof boxConfig.model != "string" || model[boxConfig.model] == undefined) {
-            boxConfig.model = JSON.stringify(fs.readFileSync("./data/default/config.json").toString()).model;
-            logger.warn(`模型名出现问题，将使用默认模型名`)
-        }
+        // 沙箱保护：模型名
         if (model[boxConfig.model][2].enabled_seeing == true) {
             msg = [
-                // { "type": "image_url", "image_url": { "url": val.url } },
                 { "type": "text", "text": msg }
             ];
             data.message.forEach(item => {
@@ -198,13 +283,6 @@ wss.on('connection', (ws) => {
             })
         }
         //询问器A
-        //1.取出临时记忆并放到tmp
-        //2.刚发的信息压入tmp
-        //3.把tmp发给询问器A
-        //4.得到 回答 后把 刚发的信息 和 回答 直接压入临时记忆
-        //不要直接替换，只能压入，不然多个请求时会被盖住
-        //刚发的信息 和 回答 同时压入临时记忆可以防止断裂
-        // if(data.message[0].type == "face")logger.debug(data.message[0].data.raw)
         var prompt = [];
         prompt.push({
             "role": "user",
@@ -223,45 +301,19 @@ wss.on('connection', (ws) => {
             var openai = new OpenAI(model[boxConfig.model][0]);
             var question;
             try {
-                //沙箱错误保护
-                if (!fs.existsSync(`./data/${back.type + back.id}/prompt`) ||
-                    !fs.statSync(`./data/${back.type + back.id}/prompt`).isDirectory()
-                ) {
-                    fs.rmSync(`./data/${back.type + back.id}/prompt`, { recursive: true, force: true });
-                    fs.cpSync(`./data/default/prompt`, `./data/${back.type + back.id}/prompt`, {
-                        // 允许复制目录
-                        recursive: true,
-                        // 覆盖已存在文件
-                        force: true
-                    })
-                    logger.warn(`./data/${back.type + back.id}/prompt 出现问题，已修复`)
-                }
-                //沙箱错误保护
-                if (!fs.existsSync(`./data/${back.type + back.id}/prompt/system.md`) ||
-                    !fs.statSync(`./data/${back.type + back.id}/prompt/system.md`).isFile()
-                ) {
-                    fs.rmSync(`./data/${back.type + back.id}/prompt/system.md`, { recursive: true, force: true });
-                    fs.cpSync(`./data/default/prompt/system.md`, `./data/${back.type + back.id}/prompt/system.md`, {
-                        // 覆盖已存在文件
-                        force: true
-                    })
-                    logger.warn(`./data/${back.type + back.id}/prompt/system.md 出现问题，已修复`)
-                }
-                //沙箱错误保护
-                if (!fs.existsSync(`./data/${back.type + back.id}/reply-x.json`) ||
-                    !fs.statSync(`./data/${back.type + back.id}/reply-x.json`).isFile() ||
-                    !isJson("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
-                ) {
-                    fs.rmSync(`./data/${back.type + back.id}/reply-x.json`, { recursive: true, force: true })
-                    logger.warn(`./data/${back.type + back.id}/reply-x.json 出现问题，已修复`)
-                }
+                // 沙箱保护：prompt 目录
+                ensurePromptDir(sessionPath);
+                // 沙箱保护：prompt 下的文件
+                ensurePromptFile(sessionPath, "system.md");
+                // 沙箱保护：reply-x.json
+                ensureReplyXJson(sessionPath);
                 question = await openai.chat.completions.create({
                     messages: [
                         {
                             "role": "system",
-                            "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()
+                            "content": fs.readFileSync(`${sessionPath}/prompt/system.md`).toString()
                         },
-                        ...JSON.parse("[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`, { flag: "a+" }).toString() + "]"),
+                        ...JSON.parse("[" + fs.readFileSync(`${sessionPath}/reply-x.json`, { flag: "a+" }).toString() + "]"),
                         ...prompt
                     ],
                     ...model[boxConfig.model][1],
@@ -286,7 +338,7 @@ wss.on('connection', (ws) => {
                 fs.writeFileSync("./config.json", JSON.stringify(config));
                 if (config.CountTokens) {
                     fs.writeFileSync(
-                        `./data/${back.type + back.id}/token.csv`,
+                        `${sessionPath}/token.csv`,
                         `${new Date()},${question.usage.total_tokens}\n`,
                         { flag: "a+" }
                     )
@@ -331,8 +383,8 @@ wss.on('connection', (ws) => {
         //把本轮全部对话（含工具调用与结果）压入临时记忆
         prompt.forEach(item => {
             fs.writeFileSync(
-                `./data/${back.type + back.id}/reply-x.json`,
-                (fs.statSync(`./data/${back.type + back.id}/reply-x.json`).size == 0 ? "" : ",\n") +
+                `${sessionPath}/reply-x.json`,
+                (fs.statSync(`${sessionPath}/reply-x.json`).size == 0 ? "" : ",\n") +
                 JSON.stringify(item),
                 { flag: "a+" }
             )
@@ -341,24 +393,15 @@ wss.on('connection', (ws) => {
         //记忆化：上下文超限时用记忆模型压缩历史
         if (lastUsage != null && lastUsage.total_tokens > model[boxConfig.memorizing_model][2].memory) {
             var openai = new OpenAI(model[boxConfig.memorizing_model][0]);
-            //沙箱错误保护
-            if (!fs.existsSync(`./data/${back.type + back.id}/prompt/memory.md`) ||
-                !fs.statSync(`./data/${back.type + back.id}/prompt/memory.md`).isFile()
-            ) {
-                fs.rmSync(`./data/${back.type + back.id}/prompt/memory.md`, { recursive: true, force: true });
-                fs.cpSync(`./data/default/prompt/memory.md`, `./data/${back.type + back.id}/prompt/memory.md`, {
-                    // 覆盖已存在文件
-                    force: true
-                })
-                logger.warn(`./data/${back.type + back.id}/prompt/memory.md 出现问题，已修复`)
-            }
+            // 沙箱保护：memory.md
+            ensurePromptFile(sessionPath, "memory.md");
             var tmp = await openai.chat.completions.create({
                 messages: [
                     {
                         "role": "system",
-                        "content": fs.readFileSync(`./data/${back.type + back.id}/prompt/memory.md`).toString()
-                            .replace(/\${system}/gi, JSON.stringify(fs.readFileSync(`./data/${back.type + back.id}/prompt/system.md`).toString()))
-                            .replace(/\${content}/gi, "[" + fs.readFileSync(`./data/${back.type + back.id}/reply-x.json`).toString() + "]")
+                        "content": fs.readFileSync(`${sessionPath}/prompt/memory.md`).toString()
+                            .replace(/\${system}/gi, JSON.stringify(fs.readFileSync(`${sessionPath}/prompt/system.md`).toString()))
+                            .replace(/\${content}/gi, "[" + fs.readFileSync(`${sessionPath}/reply-x.json`).toString() + "]")
                     }
                 ],
                 ...model[boxConfig.memorizing_model][1],
@@ -367,7 +410,7 @@ wss.on('connection', (ws) => {
                 tools: []
             });
             fs.writeFileSync(
-                `./data/${back.type + back.id}/reply-x.json`,
+                `${sessionPath}/reply-x.json`,
                 JSON.stringify(tmp.choices[0].message)
             )
         }
