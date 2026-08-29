@@ -32,10 +32,9 @@ function isJson(str) {
 /**
  * 沙箱保护：检查并修复 config.json
  * @param {string} sessionPath - 会话路径，如 "./data/group123456"
- * @param {object} defaultConfig - 默认配置对象
  * @returns {object} 解析后的配置对象
  */
-function ensureConfigJson(sessionPath, defaultConfig) {
+function ensureConfigJson(sessionPath) {
     if (
         !fs.existsSync(`${sessionPath}/config.json`) ||
         !fs.statSync(`${sessionPath}/config.json`).isFile() ||
@@ -52,17 +51,16 @@ function ensureConfigJson(sessionPath, defaultConfig) {
  * 沙箱保护：检查并修复会话配置中的关键字段
  * 包括：model（模型名）、sendMust（必须发送次数）、probability（回复概率）
  * @param {object} boxConfig - 当前会话配置
- * @param {object} modelMap - 模型映射表
  */
-function ensureBoxConfigFields(boxConfig, modelMap) {
+function ensureBoxConfigFields(boxConfig) {
     const defaultBox = JSON.parse(fs.readFileSync("./data/default/config.json").toString());
     // 保护 memorizing_model
-    if (typeof boxConfig.model != "string" || modelMap[boxConfig.memorizing_model] == undefined) {
+    if (typeof boxConfig.model != "string" || model[boxConfig.memorizing_model] == undefined) {
         boxConfig.memorizing_model = defaultBox.memorizing_model;
         logger.warn(`模型名出现问题，将使用默认模型名: ${boxConfig.memorizing_model}`)
     }
     // 保护 model
-    if (typeof boxConfig.model != "string" || modelMap[boxConfig.model] == undefined) {
+    if (typeof boxConfig.model != "string" || model[boxConfig.model] == undefined) {
         boxConfig.model = defaultBox.model;
         logger.warn(`模型名出现问题，将使用默认模型名: ${boxConfig.model}`)
     }
@@ -130,6 +128,20 @@ function ensureReplyXJson(sessionPath) {
 }
 // ====================================================
 
+// ==================== 自动话题模块 ====================
+// 会话最后活跃时间记录
+var topicLastActive = {};
+// 话题锁定标记，防止同一会话同时触发多个话题请求
+var topicLock = {};
+
+/**
+ * 更新某个会话的最后活跃时间
+ */
+function updateTopicActive(sessionId) {
+    topicLastActive[sessionId] = Date.now();
+}
+// ====================================================
+
 const wss = new WebSocketServer({ port: config.wsPort });
 log4js.configure({
     appenders: {
@@ -150,9 +162,17 @@ if (fs.existsSync("lib/task.js") == false) fs.writeFileSync("lib/task.js", "//�
 
 wss.on('connection', (ws) => {
     logger.info("有客户端连接")
-    setInterval(() => {
-        eval(fs.readFileSync(("lib/task.js")).toString())
-    }, 24 * 60 * 60 * 1000)
+
+    // 定时任务：自动找话题等（每 topicCheckInterval 毫秒执行一次，默认30秒）
+    var topicCheckInterval = config.topicCheckInterval || 30000;
+    var topicTimer = setInterval(() => {
+        try {
+            eval(fs.readFileSync("lib/task.js").toString());
+        } catch (e) {
+            logger.error(`定时任务错误: ${e.message}`);
+        }
+    }, topicCheckInterval);
+
     ws.on('message', async (data) => {
         //ws接收
         data = JSON.parse(data.toString());
@@ -248,10 +268,10 @@ wss.on('connection', (ws) => {
             })
         } else {
             // 沙箱保护：config.json
-            boxConfig = ensureConfigJson(sessionPath, config);
+            boxConfig = ensureConfigJson(sessionPath);
         }
         // 沙箱保护：会话配置关键字段（model / sendMust / probability）
-        ensureBoxConfigFields(boxConfig, model);
+        ensureBoxConfigFields(boxConfig);
         // 将会话配置中的 sendMust 和 probability 同步到全局 config（供 filter.js 使用）
         fs.writeFileSync(`${sessionPath}/content.txt`, msg + "\n", { flag: "a+" });
         //过滤器
@@ -268,6 +288,10 @@ wss.on('connection', (ws) => {
             ) == false
         ) return;
         if (_over_ == true) return;
+
+        // 更新该会话的最后活跃时间（有消息来了，说明有人说话）
+        updateTopicActive(back.type + back.id);
+
         // 沙箱保护：模型名
         if (model[boxConfig.model][2].enabled_seeing == true) {
             msg = [
@@ -419,6 +443,8 @@ wss.on('connection', (ws) => {
     // 连接关闭
     ws.on('close', () => {
         logger.debug('客户端已断开连接');
+        // 清理定时器
+        if (topicTimer) clearInterval(topicTimer);
     });
 });
 

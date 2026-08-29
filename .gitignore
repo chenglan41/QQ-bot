@@ -2,8 +2,6 @@
 /node_modules/
 /emotion/
 /log/
-/space.json
-/lib/task.js
 /model.json
 /data/*
 !/data/default/

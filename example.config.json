@@ -12,5 +12,9 @@
     "prompt_cache_hit_tokens": 999999999999,
     "prompt_cache_miss_tokens": 999999999999,
     "banned_user": [],
-    "admin":[]
+    "admin":[],
+    "topicInterval": 1800000,
+    "topicCheckInterval": 30000,
+    "topicStartHour": 8,
+    "topicEndHour": 23
 }
