@@ -234,17 +234,18 @@ wss.on('connection', (ws) => {
                     "action": "send_group_msg",
                     "params": {
                         "group_id": back.id,
-                        "message": [
-                            // { type: 'at', data: { qq: data.sender.user_id.toString() } },
-                            // {
-                            //     "type": "reply",
-                            //     "data": {
-                            //         "id": "string",
-                            //         "seq": data.message_seq
-                            //     }
-                            // },
-                            (typeof content == "string") ? { type: 'text', data: { text: content } } : content
-                        ]
+                        "message":content
+                        // "message": [
+                        //     // { type: 'at', data: { qq: data.sender.user_id.toString() } },
+                        //     // {
+                        //     //     "type": "reply",
+                        //     //     "data": {
+                        //     //         "id": "string",
+                        //     //         "seq": data.message_seq
+                        //     //     }
+                        //     // },
+                        //     (typeof content == "string") ? { type: 'text', data: { text: content } } : content
+                        // ]
                     },
                     "echo": ""
                 }));
@@ -275,6 +276,18 @@ wss.on('connection', (ws) => {
         // 将会话配置中的 sendMust 和 probability 同步到全局 config（供 filter.js 使用）
         fs.writeFileSync(`${sessionPath}/content.txt`, msg + "\n", { flag: "a+" });
         //过滤器
+        //拉黑检测
+        if ((back.type == "private" || (back.type == "group" && at.length > 0 && at.indexOf(config.uid) != -1)) && config.banned_user.indexOf(data.sender.user_id) != -1) {
+            logger.info(`截断被拉黑用户(${data.sender.user_id})消息`)
+            reply([
+                {
+                    "type": "reply",
+                    "data": {
+                        "id": "string",
+                        "seq": data.message_seq
+                    }
+                }, { type: 'text', data: { text: "你已被拉黑" } }])
+        }
         var filter;
         eval(fs.readFileSync("./lib/filter.js").toString())
         if (sendMust[back.type + back.id] == undefined || sendMust[back.type + back.id] == null || sendMust[back.type + back.id] == NaN) {
